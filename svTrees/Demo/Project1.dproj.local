@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899.12.30 00:00:00.000.476,=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\TestyProj (1)\TestyProj\Profiling\AQtimeModule2.aqt</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.916,C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Project1.dproj=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\TestyProj\Project1.dproj</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.951,C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.dfm=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\TestyProj\Unit1.dfm</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.951,C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.pas=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\TestyProj\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.158,=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.709,=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+  </Transactions>
+</BorlandProject>
