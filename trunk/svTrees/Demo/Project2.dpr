@@ -1,6 +1,6 @@
 // JCL_DEBUG_EXPERT_GENERATEJDBG OFF
 // JCL_DEBUG_EXPERT_INSERTJDBG OFF
-program Project1;
+program Project2;
 
 uses
   Forms,

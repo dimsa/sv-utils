@@ -7,5 +7,9 @@
     <Transaction>1899.12.30 00:00:00.000.951,C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.pas=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\TestyProj\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.158,=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.709,=C:\Users\linas.VIKARINA\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2011.02.21 23:03:32.007.pas,D:\Delphi Projects\SVN Projects\sv-utils\svTrees\Demo\Unit1.pas=</Transaction>
+    <Transaction>2011.02.21 23:03:32.007.dfm,D:\Delphi Projects\SVN Projects\sv-utils\svTrees\Demo\Unit1.dfm=</Transaction>
+    <Transaction>2011.02.21 23:03:34.346.pas,D:\Delphi Projects\SVN Projects\sv-utils\svTrees\Demo\Unit2.pas=</Transaction>
+    <Transaction>2011.02.21 23:03:34.346.dfm,D:\Delphi Projects\SVN Projects\sv-utils\svTrees\Demo\Unit2.dfm=</Transaction>
   </Transactions>
 </BorlandProject>
