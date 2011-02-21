@@ -72,7 +72,7 @@ object Form1: TForm1
             item
               Caption = 'Build Default'
               ImageIndex = 39
-              OnClick = CategoryButtons1Categories2Items0Click
+              OnClick = BuildDefault
             end
             item
               Caption = 'Build Virtual'
@@ -102,10 +102,6 @@ object Form1: TForm1
     TabOrder = 1
     object ts1: TTabSheet
       Caption = 'Default Treeview'
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object TreeView1: TTreeView
         Left = 0
         Top = 0
@@ -120,10 +116,6 @@ object Form1: TForm1
     object ts2: TTabSheet
       Caption = 'VirtualStringTree'
       ImageIndex = 1
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object vt1: TVirtualStringTree
         Left = 0
         Top = 0
@@ -131,7 +123,7 @@ object Form1: TForm1
         Height = 392
         Align = alClient
         BorderStyle = bsNone
-        Header.AutoSizeIndex = 0
+        Header.AutoSizeIndex = -1
         Header.DefaultHeight = 17
         Header.Font.Charset = DEFAULT_CHARSET
         Header.Font.Color = clWindowText
@@ -140,6 +132,7 @@ object Form1: TForm1
         Header.Font.Style = []
         Header.MainColumn = -1
         TabOrder = 0
+        TreeOptions.PaintOptions = [toHideFocusRect, toHotTrack, toShowButtons, toShowDropmark, toShowRoot, toShowTreeLines, toThemeAware, toUseBlendedImages, toUseBlendedSelection]
         TreeOptions.SelectionOptions = [toExtendedFocus]
         OnGetText = vt1GetText
         OnInitChildren = vt1InitChildren
@@ -161,30 +154,13 @@ object Form1: TForm1
           Height = 13
           Caption = 'Root Count'
         end
-        object btn1: TButton
-          Left = 248
-          Top = 6
-          Width = 75
-          Height = 25
-          Caption = 'Abs Index'
-          TabOrder = 1
-          OnClick = btn1Click
-        end
-        object edt1: TEdit
-          Left = 89
-          Top = 74
-          Width = 72
-          Height = 21
-          TabOrder = 8
-          Text = 'Item 1'
-        end
         object btn2: TButton
           Left = 248
           Top = 40
           Width = 75
           Height = 25
           Caption = 'Delete'
-          TabOrder = 5
+          TabOrder = 4
           OnClick = btn2Click
         end
         object btn3: TButton
@@ -202,7 +178,7 @@ object Form1: TForm1
           Width = 75
           Height = 25
           Caption = 'Add'
-          TabOrder = 4
+          TabOrder = 3
           OnClick = btn4Click
         end
         object btn5: TButton
@@ -211,7 +187,7 @@ object Form1: TForm1
           Width = 75
           Height = 25
           Caption = 'Save'
-          TabOrder = 2
+          TabOrder = 1
           OnClick = btn5Click
         end
         object btn6: TButton
@@ -220,17 +196,8 @@ object Form1: TForm1
           Width = 75
           Height = 25
           Caption = 'Load'
-          TabOrder = 3
+          TabOrder = 2
           OnClick = btn6Click
-        end
-        object btn7: TButton
-          Left = 8
-          Top = 72
-          Width = 75
-          Height = 25
-          Caption = 'Find'
-          TabOrder = 6
-          OnClick = btn7Click
         end
         object seCount: TSpinEdit
           Left = 249
@@ -240,7 +207,7 @@ object Form1: TForm1
           Increment = 100
           MaxValue = 0
           MinValue = 0
-          TabOrder = 7
+          TabOrder = 5
           Value = 5000
         end
       end
