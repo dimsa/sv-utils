@@ -14,7 +14,7 @@ object Form1: TForm1
   PixelsPerInch = 96
   TextHeight = 13
   object Splitter1: TSplitter
-    Left = 49
+    Left = 75
     Top = 0
     Height = 480
     ExplicitLeft = 104
@@ -24,7 +24,7 @@ object Form1: TForm1
   object bgrDemo: TSVButtonGroup
     Left = 0
     Top = 0
-    Width = 49
+    Width = 75
     Height = 480
     Align = alLeft
     BevelInner = bvNone
@@ -33,22 +33,19 @@ object Form1: TForm1
     Items = <
       item
         Caption = 'First <b>bold</b>'
-        OnClick = DoClick
       end
       item
         Caption = 'Second <i>italic</i>'
-        OnClick = DoClick
       end
       item
         Caption = 'Third <u>underline</u>'
-        OnClick = DoClick
       end
       item
         Caption = 'Fourth <s>strikeout</s>'
-        OnClick = DoClick
       end>
     ItemIndex = 0
     TabOrder = 0
+    OnButtonClicked = bgrDemoButtonClicked
     Colors.BackColor = clWindow
     Colors.ButtonColor = clWindow
     Colors.ButtonColorFrom = cl3DLight
