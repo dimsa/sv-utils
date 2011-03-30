@@ -57,6 +57,7 @@ type
     FHTMLCaptions: Boolean;
     FButtonGradientDirection: TGradientDirection;
     FDrawFocusRect: Boolean;
+    FHotTrack: Boolean;
     procedure SetButtonGradient(const Value: Boolean);
     procedure ColorsChange(Sender: TObject);
     procedure SetHTMLCaptions(const Value: Boolean);
@@ -81,6 +82,7 @@ type
        read FButtonGradientDirection write SetButtonGradientDirection default gdVertical;
     property Colors: TButtonGroupColors read FColors write FColors;
     property DrawFocusRect: Boolean read FDrawFocusRect write SetDrawFocusRect default False;
+    property HotTrack: Boolean read FHotTrack write FHotTrack default True;
 {$REGION 'Doc'}
       /// <summary>
       ///  HTMLCaptions
@@ -140,6 +142,7 @@ begin
   FColors.ButtonDownColor := clBtnFace;
   FColors.ButtonDownColorFrom := clBtnFace;
   FColors.ButtonDownColorTo := clBtnFace;
+  FHotTrack := True;
 
   FHTMLCaptions := False;
   FButtonGradient := True;
@@ -157,16 +160,10 @@ end;
 procedure TSVButtonGroup.DrawButton(Index: Integer; Canvas: TCanvas; Rect: TRect;
   State: TButtonDrawState);
 var
-  TextLeft, TextTop: Integer;
-  RectHeight: Integer;
-  ImgTop: Integer;
-  TextOffset: Integer;
+  TextLeft, TextTop, RectHeight, ImgTop, TextOffset: Integer;
   ButtonItem: TGrpButtonItem;
-  FillColor: TColor;
-  EdgeColor: TColor;
-  InsertIndication: TRect;
-  TextRect: TRect;
-  OrgRect: TRect;
+  FillColor, EdgeColor: TColor;
+  InsertIndication, TextRect, OrgRect: TRect;
   Text: string;
   bWasFilled: Boolean;
   OldBrushStyle: TBrushStyle;
@@ -216,7 +213,7 @@ begin
 
     ButtonItem := Self.Items[Index];
 
-    if (bdsHot in State) and not (bdsDown in State) and (Assigned(ButtonItem.OnClick)) then
+    if (bdsHot in State) and not (bdsDown in State) and (FHotTrack) then
     begin
       EdgeColor := GetShadowColor(EdgeColor, -50);
       { Draw the edge outline }
@@ -344,7 +341,7 @@ begin
   ix := Self.IndexOfButtonAt(X,Y);
   if ix > -1 then
   begin
-    if Assigned(Self.Items[ix].OnClick) then
+    if FHotTrack then
     begin
       Self.Cursor := crHandPoint;
     end

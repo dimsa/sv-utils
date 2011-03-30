@@ -11,6 +11,7 @@ type
     bgrDemo: TSVButtonGroup;
     Splitter1: TSplitter;
     procedure DoClick(Sender: TObject);
+    procedure bgrDemoButtonClicked(Sender: TObject; Index: Integer);
   private
     { Private declarations }
   public
@@ -23,6 +24,11 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TForm1.bgrDemoButtonClicked(Sender: TObject; Index: Integer);
+begin
+  DoClick(nil);
+end;
 
 procedure TForm1.DoClick(Sender: TObject);
 begin
