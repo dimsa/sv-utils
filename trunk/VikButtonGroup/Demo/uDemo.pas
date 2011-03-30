@@ -4,11 +4,12 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ButtonGroup, uSVButtonGroup;
+  Dialogs, ButtonGroup, uSVButtonGroup, ExtCtrls;
 
 type
   TForm1 = class(TForm)
     bgrDemo: TSVButtonGroup;
+    Splitter1: TSplitter;
     procedure DoClick(Sender: TObject);
   private
     { Private declarations }

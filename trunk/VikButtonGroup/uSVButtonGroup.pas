@@ -76,11 +76,11 @@ type
       /// If true, uses From and To colors to draw gradient buttons
       /// </summary>
 {$ENDREGION}
-    property ButtonGradient: Boolean read FButtonGradient write SetButtonGradient;
+    property ButtonGradient: Boolean read FButtonGradient write SetButtonGradient default True;
     property ButtonGradientDirection: TGradientDirection
-       read FButtonGradientDirection write SetButtonGradientDirection;
+       read FButtonGradientDirection write SetButtonGradientDirection default gdVertical;
     property Colors: TButtonGroupColors read FColors write FColors;
-    property DrawFocusRect: Boolean read FDrawFocusRect write SetDrawFocusRect;
+    property DrawFocusRect: Boolean read FDrawFocusRect write SetDrawFocusRect default False;
 {$REGION 'Doc'}
       /// <summary>
       ///  HTMLCaptions
@@ -98,7 +98,7 @@ type
       /// <font-family> Font family e.g. <font-family=Arial>This is arial</font-family>
       /// </summary>
 {$ENDREGION}
-    property HTMLCaptions: Boolean read FHTMLCaptions write SetHTMLCaptions;
+    property HTMLCaptions: Boolean read FHTMLCaptions write SetHTMLCaptions default False;
   end;
 
 
@@ -169,6 +169,7 @@ var
   OrgRect: TRect;
   Text: string;
   bWasFilled: Boolean;
+  OldBrushStyle: TBrushStyle;
 begin
   if Assigned(OnDrawButton) and (not (csDesigning in ComponentState)) then
     OnDrawButton(Self, Index, Canvas, Rect, State)
@@ -178,12 +179,7 @@ begin
     bWasFilled := False;
 
     Canvas.Font := Self.Font;
-    if bdsSelected in State then
-    begin
-      Canvas.Brush.Color := GetShadowColor(clBtnFace, -25);
-      Canvas.Font.Color := clBtnText;
-    end
-    else if (bdsDown in State) then
+    if (bdsDown in State) or (bdsSelected in State) then
     begin
       if FButtonGradient then
       begin
@@ -311,10 +307,11 @@ begin
       TextRect.Bottom := Rect.Bottom -1;
       Text := ButtonItem.Caption;
 
+      OldBrushStyle := Canvas.Brush.Style;
       Canvas.Brush.Style := bsClear;
 
       if FHTMLCaptions then
-        DrawHTML(TextRect, Canvas, Text)
+        DrawHTML(TextRect, Canvas, Text, [vdfEndEllipsis])
       else
         Canvas.TextRect(TextRect, Text, [tfEndEllipsis]);
     end;
@@ -329,6 +326,8 @@ begin
         Canvas.DrawFocusRect(Rect);
       end;
     end;
+
+    Canvas.Brush.Style := OldBrushStyle;
 
     if Assigned(OnAfterDrawButton) then
       OnAfterDrawButton(Self, Index, Canvas, OrgRect, State);
