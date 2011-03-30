@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2011.03.30 19:24:45.484,=C:\Users\Linas\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2011.03.30 19:28:52.408,D:\Delphi Projects\SVN Projects\sv-utils\VikButtonGroup\Demo\uDemo.dfm=C:\Users\Linas\Documents\RAD Studio\Projects\Unit1.dfm</Transaction>
+    <Transaction>2011.03.30 19:28:52.408,D:\Delphi Projects\SVN Projects\sv-utils\VikButtonGroup\Demo\uDemo.pas=C:\Users\Linas\Documents\RAD Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2011.03.30 19:29:01.675,D:\Delphi Projects\SVN Projects\sv-utils\VikButtonGroup\Demo\Demo.dproj=C:\Users\Linas\Documents\RAD Studio\Projects\Project1.dproj</Transaction>
+  </Transactions>
+</BorlandProject>
