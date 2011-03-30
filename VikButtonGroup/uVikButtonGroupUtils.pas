@@ -1,4 +1,4 @@
-{*******************************************************}
+﻿{*******************************************************}
 {       uVikButtonGroupUtils                            }
 {                                                       }
 {                                                       }
@@ -18,8 +18,14 @@ uses
   Controls,
   Types;
 
+type
+  TDrawFlagEx = (vdfCenterVertically, vdfCenterHorizontally, vdfEndEllipsis);
 
-  function DrawHTML(const ARect: TRect; const ACanvas: TCanvas; const Text: String): Integer;
+  TDrawFlagsEx = set of TDrawFlagEx;
+
+
+  function DrawHTML(const ARect: TRect; const ACanvas: TCanvas; const Text: String;
+    Flags: TDrawFlagsEx = []): Integer;
   procedure DisableRedraw(Control: TWinControl);
   procedure EnableRedraw(Control: TWinControl; InvalidateAfter: Boolean = True);
 
@@ -28,11 +34,13 @@ implementation
 
 uses
   Windows,
-  Messages;
+  Messages,
+  ExtCtrls;
 
 
 
-function DrawHTML(const ARect: TRect; const ACanvas: TCanvas; const Text: String): Integer;
+function DrawHTML(const ARect: TRect; const ACanvas: TCanvas; const Text: String;
+  Flags: TDrawFlagsEx = []): Integer;
 (*DrawHTML - Draws text on a canvas using tags based on a simple subset of HTML/CSS
 
   <B> - Bold e.g. <B>This is bold</B>
@@ -103,177 +111,229 @@ const
   TagColour = 'COLOUR';
 
 var
-  x, y, idx, CharWidth, MaxCharHeight: Integer;
-  CurrChar: Char;
+  x, y, idx, CharWidth, MaxCharHeight, iWidth, EllWidth: Integer;
+  CurrChar: WideChar;
   Tag, TagValue: String;
   PreviousFontColour: TColor;
   PreviousFontFamily: String;
   PreviousFontSize: Integer;
   PreviousColour: TColor;
-
+ // Buf: Graphics.TBitmap;
+  bCanvas: TCanvas;
 begin
-{  ACanvas.Font.Size := Canvas.Font.Size;
-  ACanvas.Font.Name := Canvas.Font.Name;
-  ACanvas.Font.Color := Canvas.Font.Color;
-  ACanvas.Font.Style := Canvas.Font.Style;   }
-
   PreviousFontColour := ACanvas.Font.Color;
   PreviousFontFamily := ACanvas.Font.Name;
   PreviousFontSize := ACanvas.Font.Size;
   PreviousColour := ACanvas.Brush.Color;
 
- // y := ARect.Top + 1;
-  idx := 1;
+ // Buf := Graphics.TBitmap.Create;
+  try
+   { Buf.Transparent := True;
+    Buf.PixelFormat := pf32bit;
 
-  MaxCharHeight := ACanvas.TextHeight('Ag');
+    Buf.Height := ARect.Bottom - ARect.Top;
+    Buf.Width := ARect.Right - ARect.Left;   }
 
-  x := ARect.Left;
-  y := ARect.Top;
- // y := ((ARect.Bottom - ARect.Top) div 2) - (MaxCharHeight div 2);    //center vertically
+    bCanvas := ACanvas;
 
-  While idx <= length(Text) do
-  begin
-    CurrChar := Text[idx];
+   // bCanvas := Buf.Canvas;
+    bCanvas.Font := ACanvas.Font;
+    bCanvas.Brush := ACanvas.Brush;
+    bCanvas.Brush.Style := bsClear;
 
-    // Is this a tag?
-    if CurrChar = '<' then
+    MaxCharHeight := bCanvas.TextHeight('Ag');
+
+    if vdfEndEllipsis in Flags then
+      EllWidth := bCanvas.TextWidth('...')
+    else
+      EllWidth := 0;
+
+    x := ARect.Left;
+
+    if vdfCenterVertically in Flags then
+      y := ((ARect.Bottom - ARect.Top) div 2) - (MaxCharHeight div 2)
+    else
+      y := ARect.Top + 1;
+
+  //  y := ARect.Top + 1;
+
+    idx := 1;
+
+    While idx <= length(Text) do
     begin
-      Tag := '';
+      CurrChar := Text[idx];
 
-      inc(idx);
-
-      // Find the end of then tag
-      while (Text[idx] <> '>') and (idx <= length(Text)) do
+      // Is this a tag?
+      if CurrChar = '<' then
       begin
-        Tag := Tag +  UpperCase(Text[idx]);
+        Tag := '';
 
         inc(idx);
-      end;
 
-      ///////////////////////////////////////////////////
-      // Simple tags
-      ///////////////////////////////////////////////////
-      if Tag = TagBold then
-        ACanvas.Font.Style := ACanvas.Font.Style + [fsBold] else
-
-      if Tag = TagItalic then
-        ACanvas.Font.Style := ACanvas.Font.Style + [fsItalic] else
-
-      if Tag = TagUnderline then
-        ACanvas.Font.Style := ACanvas.Font.Style + [fsUnderline] else
-
-      if Tag = TagStrike then
-        ACanvas.Font.Style := ACanvas.Font.Style + [fsStrikeOut] else
-
-      if Tag = TagBreak then
-      begin
-        x := ARect.Left;
-
-        inc(y, MaxCharHeight);
-      end else
-
-      ///////////////////////////////////////////////////
-      // Closing tags
-      ///////////////////////////////////////////////////
-      if Tag = CloseTag(TagBold) then
-        ACanvas.Font.Style := ACanvas.Font.Style - [fsBold] else
-
-      if Tag = CloseTag(TagItalic) then
-        ACanvas.Font.Style := ACanvas.Font.Style - [fsItalic] else
-
-      if Tag = CloseTag(TagUnderline) then
-        ACanvas.Font.Style := ACanvas.Font.Style - [fsUnderline] else
-
-      if Tag = CloseTag(TagStrike) then
-        ACanvas.Font.Style := ACanvas.Font.Style - [fsStrikeOut] else
-
-      if Tag = CloseTag(TagFontSize) then
-        ACanvas.Font.Size := PreviousFontSize else
-
-      if Tag = CloseTag(TagFontFamily) then
-        ACanvas.Font.Name := PreviousFontFamily else
-
-      if Tag = CloseTag(TagFontColour) then
-        ACanvas.Font.Color := PreviousFontColour else
-
-      if Tag = CloseTag(TagColour) then
-        ACanvas.Brush.Color := PreviousColour else
-
-      ///////////////////////////////////////////////////
-      // Tags with values
-      ///////////////////////////////////////////////////
-      begin
-        // Get the tag value (everything after '=')
-        TagValue := GetTagValue(Tag);
-
-        if TagValue <> '' then
+        // Find the end of then tag
+        while (Text[idx] <> '>') and (idx <= length(Text)) do
         begin
-          // Remove the value from the tag
-          Tag := copy(Tag, 1, pos('=', Tag) - 1);
+          Tag := Tag +  UpperCase(Text[idx]);
 
-          if Tag = TagFontSize then
+          inc(idx);
+        end;
+
+        ///////////////////////////////////////////////////
+        // Simple tags
+        ///////////////////////////////////////////////////
+        if Tag = TagBold then
+          bCanvas.Font.Style := bCanvas.Font.Style + [fsBold] else
+
+        if Tag = TagItalic then
+          bCanvas.Font.Style := bCanvas.Font.Style + [fsItalic] else
+
+        if Tag = TagUnderline then
+          bCanvas.Font.Style := bCanvas.Font.Style + [fsUnderline] else
+
+        if Tag = TagStrike then
+          bCanvas.Font.Style := bCanvas.Font.Style + [fsStrikeOut] else
+
+        if Tag = TagBreak then
+        begin
+          x := ARect.Left;
+
+          inc(y, MaxCharHeight);
+        end else
+
+        ///////////////////////////////////////////////////
+        // Closing tags
+        ///////////////////////////////////////////////////
+        if Tag = CloseTag(TagBold) then
+          bCanvas.Font.Style := bCanvas.Font.Style - [fsBold] else
+
+        if Tag = CloseTag(TagItalic) then
+          bCanvas.Font.Style := bCanvas.Font.Style - [fsItalic] else
+
+        if Tag = CloseTag(TagUnderline) then
+          bCanvas.Font.Style := bCanvas.Font.Style - [fsUnderline] else
+
+        if Tag = CloseTag(TagStrike) then
+          bCanvas.Font.Style := bCanvas.Font.Style - [fsStrikeOut] else
+
+        if Tag = CloseTag(TagFontSize) then
+          bCanvas.Font.Size := PreviousFontSize else
+
+        if Tag = CloseTag(TagFontFamily) then
+          bCanvas.Font.Name := PreviousFontFamily else
+
+        if Tag = CloseTag(TagFontColour) then
+          bCanvas.Font.Color := PreviousFontColour else
+
+        if Tag = CloseTag(TagColour) then
+          bCanvas.Brush.Color := PreviousColour else
+
+        ///////////////////////////////////////////////////
+        // Tags with values
+        ///////////////////////////////////////////////////
+        begin
+          // Get the tag value (everything after '=')
+          TagValue := GetTagValue(Tag);
+
+          if TagValue <> '' then
           begin
-            PreviousFontSize := ACanvas.Font.Size;
-            ACanvas.Font.Size := StrToIntDef(TagValue, ACanvas.Font.Size);
-          end else
+            // Remove the value from the tag
+            Tag := copy(Tag, 1, pos('=', Tag) - 1);
 
-          if Tag = TagFontFamily then
-          begin
-            PreviousFontFamily := ACanvas.Font.Name;
-            ACanvas.Font.Name := TagValue;
-          end;
+            if Tag = TagFontSize then
+            begin
+              PreviousFontSize := bCanvas.Font.Size;
+              bCanvas.Font.Size := StrToIntDef(TagValue, bCanvas.Font.Size);
+            end else
 
-          if Tag = TagFontColour then
-          begin
-            PreviousFontColour := ACanvas.Font.Color;
-
-            try
-              ACanvas.Font.Color := ColorCodeToColor(TagValue);
-            except
-              //Just in case the canvas colour is invalid
+            if Tag = TagFontFamily then
+            begin
+              PreviousFontFamily := bCanvas.Font.Name;
+              bCanvas.Font.Name := TagValue;
             end;
-          end else
 
-          if Tag = TagColour then
-          begin
-            PreviousColour := ACanvas.Brush.Color;
+            if Tag = TagFontColour then
+            begin
+              PreviousFontColour := bCanvas.Font.Color;
 
-            try
-              ACanvas.Brush.Color := ColorCodeToColor(TagValue);
-            except
-              //Just in case the canvas colour is invalid
+              try
+                bCanvas.Font.Color := ColorCodeToColor(TagValue);
+              except
+                //Just in case the canvas colour is invalid
+              end;
+            end else
+
+            if Tag = TagColour then
+            begin
+              PreviousColour := bCanvas.Brush.Color;
+
+              try
+                bCanvas.Brush.Color := ColorCodeToColor(TagValue);
+              except
+                //Just in case the canvas colour is invalid
+              end;
             end;
           end;
         end;
-      end;
-    end
-    else
-    // Draw the character if it's not a ctrl char
-    if CurrChar >= #32 then
-    begin
-      CharWidth := ACanvas.TextWidth(CurrChar);
-
-      if x + CharWidth > ARect.Right then
+      end
+      else
+      // Draw the character if it's not a ctrl char
+      if CurrChar >= #32 then
       begin
-        x := ARect.Left;
+        CharWidth := bCanvas.TextWidth(CurrChar);
 
-        inc(y, MaxCharHeight);
+
+        if x + CharWidth + EllWidth > ARect.Right then
+        begin
+          if vdfEndEllipsis in Flags then
+          begin
+            bCanvas.Font.Size := PreviousFontSize;
+            bCanvas.Font.Color := PreviousFontColour;
+            bCanvas.Font.Style := bCanvas.Font.Style - [fsBold, fsItalic, fsUnderline, fsStrikeOut];
+            bCanvas.Font.Name := PreviousFontFamily;
+           // bCanvas.Brush.Color := PreviousColour;
+
+            bCanvas.TextOut(ARect.Right - CharWidth - EllWidth + 1, Y, '...');
+            Break;
+          end
+          else
+          begin
+            x := ARect.Left;
+
+            inc(y, MaxCharHeight);
+          end;
+        end;
+
+        if y + MaxCharHeight < ARect.Bottom then
+        begin
+          bCanvas.TextOut(x, y, CurrChar);
+        end;
+
+        x := x + CharWidth;
       end;
 
-      if y + MaxCharHeight < ARect.Bottom then
-      begin
-        ACanvas.Brush.Style := bsClear;
-
-        ACanvas.TextOut(x, y, CurrChar);
-      end;
-
-      x := x + CharWidth;
+      inc(idx);
     end;
 
-    inc(idx);
-  end;
+    Result := x;
 
-  Result := x;
+  {  iWidth := x - ARect.Left;
+
+    if vdfCenterHorizontally in Flags then
+      x := ((ARect.Right - ARect.Left) div 2) - (iWidth div 2)
+    else
+      x := ARect.Left;  }
+
+  {  if vdfCenterVertically in Flags then
+      y := ((ARect.Bottom - ARect.Top) div 2) - (MaxCharHeight div 2)
+    else
+      y := ARect.Top + 1;    }
+
+  //  BitBlt(ACanvas.Handle, x, y, Buf.Width, Buf.Height, bCanvas.Handle, 0, 0,
+    //  MERGECOPY  {SRCCOPY});
+
+  finally
+   // Buf.Free;
+  end;
 end;
 
 procedure DisableRedraw(Control: TWinControl);
