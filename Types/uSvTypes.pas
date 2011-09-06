@@ -34,6 +34,7 @@ type
     function ToString(): string;
     class function Init(): TPathBuilder; static;
     class function InitCurrentDir(): TPathBuilder; static;
+    class function InitHomePath(): TPathBuilder; static;
   end;
 
 implementation
@@ -68,6 +69,11 @@ end;
 class function TPathBuilder.InitCurrentDir: TPathBuilder;
 begin
   Result.sPath := IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0)));
+end;
+
+class function TPathBuilder.InitHomePath: TPathBuilder;
+begin
+  Result.sPath := IncludeTrailingPathDelimiter(GetHomePath);
 end;
 
 function TPathBuilder.ToString: string;
