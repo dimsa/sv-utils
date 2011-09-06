@@ -1,4 +1,4 @@
-#summary record for dynamically build your file paths.
+#summary record for dynamically building your file paths.
 #labels Phase-Implementation
 
 = Introduction =
