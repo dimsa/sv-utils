@@ -203,7 +203,7 @@ type
     /// </summary>
     /// <param name="Node">Node to use</param>
     /// <returns>index string, empty string if node is unassigned</returns>
-    function GenerateIndex(Node: TSVTreeNode<T>): RawByteString; inline;
+    function GenerateIndex(const Node: TSVTreeNode<T>): RawByteString; inline;
     /// <summary>
     /// Iterates recursively through all the children of the given node
     /// </summary>
@@ -223,7 +223,7 @@ type
     function GetLast(Node: TSVTreeNode<T>): TSVTreeNode<T>;
     function GetLastChild(Node: TSVTreeNode<T>): TSVTreeNode<T>;
 
-    function GetNodeLevel(Node: TSVTreeNode<T>): Integer;
+    function GetNodeLevel(const Node: TSVTreeNode<T>): Integer;
     //procedures
     procedure BeginUpdate;
     procedure EndUpdate;
@@ -752,8 +752,8 @@ begin
 end;
 
 function TSVTree<T>.InitNode(ParentNode: TSVTreeNode<T>; Data: T):TSVTreeNode<T>;
-var
-  sHash: RawByteString;
+//var
+//  sHash: RawByteString;
 begin
   Result := TSVTreeNode<T>.Create;
  // New(Result);
@@ -784,8 +784,8 @@ begin
 
   AdjustTotalCount(ParentNode, 1, True);
 
-  sHash := GenerateIndex(Result);
-  FMainIndex.Add(sHash, Result);
+//  sHash := GenerateIndex(Result);
+  FMainIndex.Add(GenerateIndex(Result), Result);
   //ateityje atnaujinam  total count kitiems
  // AdjustTotalCount(Result, 1, True);
 
@@ -1177,19 +1177,19 @@ begin
   FRoot := nil;
 end;
 
-function TSVTree<T>.GenerateIndex(Node: TSVTreeNode<T>): RawByteString;
+function TSVTree<T>.GenerateIndex(const Node: TSVTreeNode<T>): RawByteString;
 var
   pNode: TSVTreeNode<T>;
 begin
-  Result := EmptyAnsiStr;
+  Result := '';
   if Assigned(Node) then
   begin
     Result := RawByteString(IntToStr(Node.FNodeIndex));
     pNode := Node.FParent;
     while Assigned(pNode) and (pNode <> FRoot) do
     begin
-      Result := Result + RawByteString(Format('/%D',[pNode.FNodeIndex]));
-
+     // Result := Result + RawByteString(Format('/%D',[pNode.FNodeIndex]));
+      Result := Result + '/' + IntToStr(pNode.FNodeIndex);
       pNode := pNode.FParent;
     end;
   end;
@@ -1335,7 +1335,7 @@ begin
   end;
 end;
 
-function TSVTree<T>.GetNodeLevel(Node: TSVTreeNode<T>): Integer;
+function TSVTree<T>.GetNodeLevel(const Node: TSVTreeNode<T>): Integer;
 var
   pRun: TSVTreeNode<T>;
 begin
