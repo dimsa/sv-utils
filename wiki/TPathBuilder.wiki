@@ -1,4 +1,4 @@
-#summary One-sentence summary of this page.
+#summary record for dynamically build your file paths.
 #labels Phase-Implementation
 
 = Introduction =
