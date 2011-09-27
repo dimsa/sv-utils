@@ -1,3 +1,6 @@
+// JCL_DEBUG_EXPERT_GENERATEJDBG OFF
+// JCL_DEBUG_EXPERT_INSERTJDBG OFF
+// JCL_DEBUG_EXPERT_DELETEMAPFILE OFF
 program FetchIntoDataStructureDemo;
 
 {$APPTYPE CONSOLE}
@@ -5,9 +8,15 @@ program FetchIntoDataStructureDemo;
 {$R *.res}
 
 uses
-  System.SysUtils,
   SQLiteTable3,
+  {$IFDEF DELPHI16_UP}
+  System.SysUtils,
+  System.Generics.Collections;
+  {$ELSE}
+  SysUtils,
   Generics.Collections;
+  {$ENDIF}
+
 
 type
   //class must have constructor without arguments
