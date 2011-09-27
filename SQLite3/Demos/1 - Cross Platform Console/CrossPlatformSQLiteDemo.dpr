@@ -5,11 +5,15 @@ program CrossPlatformSQLiteDemo;
 {$R *.res}
 
 uses
-  System.SysUtils,
   SQLiteTable3,
   SQLite3,
-  Classes,
-  IOUtils;
+  {$IFDEF DELPHI16_UP}
+  System.SysUtils,
+  System.Classes;
+  {$ELSE}
+  SysUtils,
+  Classes;
+  {$ENDIF}
 
 
 procedure LoadData1();
@@ -23,7 +27,7 @@ var
   sltb: TSQLiteTable;
 begin
   WriteLn('Load Data 1');
-  slDBpath := IncludeTrailingPathDelimiter(TPath.GetHomePath) + IncludeTrailingPathDelimiter('Test') + 'test.db';
+  slDBpath := IncludeTrailingPathDelimiter(GetHomePath) + IncludeTrailingPathDelimiter('Test') + 'test.db';
   if not ForceDirectories(ExtractFileDir(slDBpath)) then
   begin
     WriteLn('Cannot create path: ' + slDBpath);
