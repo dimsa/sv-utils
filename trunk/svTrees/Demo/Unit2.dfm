@@ -91,6 +91,20 @@ object Form1: TForm1
       ShowHint = True
       TabOrder = 0
     end
+    object edFilter: TButtonedEdit
+      Left = 24
+      Top = 88
+      Width = 121
+      Height = 21
+      TabOrder = 1
+    end
+    object ProgressBar1: TProgressBar
+      Left = 24
+      Top = 120
+      Width = 150
+      Height = 17
+      TabOrder = 2
+    end
   end
   object pc1: TPageControl
     Left = 188
@@ -210,7 +224,22 @@ object Form1: TForm1
           TabOrder = 5
           Value = 5000
         end
+        object Button1: TButton
+          Left = 8
+          Top = 8
+          Width = 75
+          Height = 25
+          Caption = 'Button1'
+          TabOrder = 6
+          OnClick = Button1Click
+        end
       end
     end
+  end
+  object VSTSearchEdit1: TVSTSearchEdit
+    OnAfterSearch = VSTSearchEdit1AfterSearch
+    VST = vt1
+    Left = 56
+    Top = 216
   end
 end

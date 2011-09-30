@@ -944,7 +944,10 @@ begin
     begin
       ACallbackProc(Node, Data, DoAbort);
       if DoAbort then
+      begin
+        Result := Node;
         Break;
+      end;
 
       Node := GetNext(Node);
     end;
