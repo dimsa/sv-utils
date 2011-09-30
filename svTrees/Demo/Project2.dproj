@@ -36,7 +36,11 @@
 			<DCC_K>false</DCC_K>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Cfg_1)'!=''">
+<<<<<<< .mine
+			<DCC_MapFile>3</DCC_MapFile>
+=======
 			<DCC_DebugInfoInExe>true</DCC_DebugInfoInExe>
+>>>>>>> .r14
 			<DCC_Description>TSVTree Demo</DCC_Description>
 			<DCC_RunTimeTypeInfo>true</DCC_RunTimeTypeInfo>
 			<BCC_DebugLineNumbers>true</BCC_DebugLineNumbers>
@@ -59,7 +63,10 @@
 				<Form>Form1</Form>
 			</DCCReference>
 			<None Include="Profiling\AQtimeModule2.aqt"/>
+<<<<<<< .mine
+=======
 			<None Include="Profiling\AQtimeModule1.aqt"/>
+>>>>>>> .r14
 			<BuildConfiguration Include="Release">
 				<Key>Cfg_2</Key>
 				<CfgParent>Base</CfgParent>
@@ -72,8 +79,13 @@
 				<CfgParent>Base</CfgParent>
 			</BuildConfiguration>
 		</ItemGroup>
+<<<<<<< .mine
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
+		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+=======
 		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
 		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj"/>
+>>>>>>> .r14
 		<ProjectExtensions>
 			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
 			<Borland.ProjectType/>

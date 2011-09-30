@@ -119,6 +119,8 @@ type
   TSQLitePreparedStatement = class;
 
   TSQLiteDatabase = class
+  class var
+    FColumnTypes: TDictionary<string,Integer>;
   private
     fDB: TSQLiteDB;
     fInTrans: boolean;
@@ -126,15 +128,24 @@ type
     fParams: TList;
     FOnQuery: THookQuery;
     FFormatSett: TFormatSettings;
+
     procedure RaiseError(const s: string; const SQL: string);
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
+    class procedure InitDefaultColumnTypes;
   protected
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
   public
     constructor Create(const FileName: string);
     destructor Destroy; override;
+     /// <summary>
+     /// Adds new supported column type
+     /// </summary>
+     /// <param name="ColTypeName">Column Type Name</param>
+     /// <param name="ColType">Column Type constant, e.g. dtStr</param>
+    class procedure AddNewSupportedColumnType(const ColTypeName: string; ColType: Integer = dtStr);
+
     function GetTable(const SQL: String): TSQLiteTable;
     procedure ExecSQL(const SQL: String); overload;
     procedure ExecSQL(Query: TSQLiteQuery); overload;
@@ -168,6 +179,9 @@ type
     procedure AddParamText(const name: string; const value: string); deprecated;
     procedure AddParamNull(const name: string); deprecated;
 
+    /// <summary>
+    /// Format settings to use for DateTime fields
+    /// </summary>
     property FmtSett: TFormatSettings read FFormatSett;
     property DB: TSQLiteDB read fDB;
   published
@@ -176,6 +190,7 @@ type
     property RowsChanged : integer read getRowsChanged;
     property Synchronised: boolean read FSync write SetSynchronised;
     property OnQuery: THookQuery read FOnQuery write FOnQuery;
+
   end;
 
   TSQLiteTable = class
@@ -198,6 +213,7 @@ type
   public
     constructor Create(DB: TSQLiteDatabase; const SQL: String);
     destructor Destroy; override;
+
     function FieldAsInteger(I: cardinal): int64;
     function FieldAsBlob(I: cardinal): TMemoryStream;
     function FieldAsBlobText(I: cardinal): string;
@@ -256,6 +272,10 @@ type
     procedure SetParamFloat(const I: Integer; value: double); overload;
     procedure SetParamText(const I: Integer; const value: string); overload;
     procedure SetParamNull(const I: Integer); overload;
+    procedure SetParamDateTime(const I: Integer; const Value: TDateTime); overload;
+    procedure SetParamDateTime(const name: string; const Value: TDateTime); overload;
+    procedure SetParamDate(const I: Integer; const Value: TDate); overload;
+    procedure SetParamDate(const name: string; const Value: TDate); overload;
 
     function ExecSQLAndMapData<T: constructor, class>(var DataList: TObjectList<T>): Boolean;
     function ExecQuery(): TSQLiteUniTable; overload;
@@ -290,11 +310,17 @@ type
     function AsBlob: TMemoryStream;
     function AsBlobPtr(out iNumBytes: integer): Pointer;
     function AsBlobText: string;
+    function AsBlobTextDef(const Def: string = ''): string;
     function AsDateTime: TDateTime;  //datetime support slows down data retrieval
+    function AsDateTimeDef(const Def: TDateTime = 0.0): TDateTime;
     function AsDouble: Double;
+    function AsDoubleDef(const Def: Double = 0.0): Double;
     function AsInteger: Int64;
+    function AsIntegerDef(const Def: Int64 = 0): Int64;
     function AsString: string;
+    function AsStringDef(const Def: string = ''): string;
     function Value: Variant;
+    function ValueDef(const Def: Variant): Variant;
   end;
 
   TSQLiteUniTable = class
@@ -366,6 +392,19 @@ uses
   Math,
   Rtti,
   TypInfo;
+
+const
+  //default supported column types defined in sqlite db
+  // each other type which isn't supported is bound as text column
+  DEF_COLCOUNT = 9;
+  DEF_COLTYPES_NAMES : array[0..DEF_COLCOUNT-1] of string =
+    ('INTEGER', 'BOOLEAN', 'NUMERIC', 'FLOAT', 'DOUBLE', 'REAL',
+     'DATETIME', 'DATE', 'BLOB'
+    );
+  DEF_COLTYPES : array[0..DEF_COLCOUNT-1] of Integer =
+    (dtInt, dtInt, dtNumeric, dtNumeric, dtNumeric, dtNumeric,
+     dtDateTime, dtDate, dtBlob
+    );
 
 procedure DisposePointer(ptr: pointer); cdecl;
 begin
@@ -675,6 +714,18 @@ begin
   Result := TSQLiteUniTable.Create(Self, SQL);
 end;
 
+class procedure TSQLiteDatabase.InitDefaultColumnTypes;
+var
+  i: Integer;
+begin
+  TSQLiteDatabase.FColumnTypes.Clear;
+
+  for i := Low(DEF_COLTYPES_NAMES) to High(DEF_COLTYPES_NAMES) do
+  begin
+    TSQLiteDatabase.FColumnTypes.Add(DEF_COLTYPES_NAMES[i], DEF_COLTYPES[i]);
+  end;
+end;
+
 function TSQLiteDatabase.GetTableValue(const SQL: string): int64;
 var
   Table: TSQLiteUniTable;
@@ -801,6 +852,18 @@ begin
   par.valuetype := SQLITE_INTEGER;
   par.valueinteger := value;
   fParams.Add(par);
+end;
+
+class procedure TSQLiteDatabase.AddNewSupportedColumnType(const ColTypeName: string; ColType: Integer);
+var
+  sColName: string;
+begin
+  if (ColTypeName <> '') and (ColType > 0) then
+  begin
+    sColName := UpperCase(ColTypeName);
+
+    FColumnTypes.AddOrSetValue(sColName, ColType);
+  end;
 end;
 
 procedure TSQLiteDatabase.AddParamFloat(const name: string; value: double);
@@ -1370,9 +1433,10 @@ end;
 procedure TSQLiteUniTable.GetDataTypes;
 var
   i: Integer;
-  sColName: string;
+  sColName, sColType: string;
   aField: TSQLiteField;
   DeclaredColType: PChar;
+  iColType: Integer;
 begin
   //get data types
   FFields.Clear;
@@ -1391,24 +1455,36 @@ begin
       FColTypes[i] := SQLite3_ColumnType(fStmt, i)
     else
     begin
-      if (DeclaredColType = 'INTEGER') or (DeclaredColType = 'BOOLEAN') then
+      sColType := UpperCase(DeclaredColType);
+
+      if TSQLiteDatabase.FColumnTypes.TryGetValue(sColType, iColType) then
+      begin
+        FColTypes[i] := iColType;
+      end
+      else
+      begin
+        FColTypes[i] := dtStr;
+      end;
+
+
+     { if (sColType = 'INTEGER') or (sColType = 'BOOLEAN') then
         FColTypes[i] := dtInt
       else
-        if (DeclaredColType = 'NUMERIC') or
-          (DeclaredColType = 'FLOAT') or
-          (DeclaredColType = 'DOUBLE') or
-          (DeclaredColType = 'REAL') then
+        if (sColType = 'NUMERIC') or
+          (sColType = 'FLOAT') or
+          (sColType = 'DOUBLE') or
+          (sColType = 'REAL') then
           FColTypes[i] := dtNumeric
         else
-        if (DeclaredColType = 'DATETIME') then
+        if (sColType = 'DATETIME') then
           FColTypes[i] := dtDateTime
-        else if (DeclaredColType = 'DATE') then
+        else if (sColType = 'DATE') then
           FColTypes[i] := dtDate
         else
-        if DeclaredColType = 'BLOB' then
+        if sColType = 'BLOB' then
           FColTypes[i] := dtBlob
           else
-            FColTypes[i] := dtStr;
+            FColTypes[i] := dtStr;  }
     end;
     aField := TSQLiteField.Create;
     aField.Table := Self;
@@ -1654,7 +1730,27 @@ end;
 
 { TSQLitePreparedStatement }
 
-procedure TSQLitePreparedStatement.SetParamFloat(const I: Integer; value: double);
+procedure TSQLitePreparedStatement.SetParamDateTime(const I: Integer; const Value: TDateTime);
+begin
+  SetParamText(I, DateTimeToStr(Value, FDB.FFormatSett));
+end;
+
+procedure TSQLitePreparedStatement.SetParamDate(const I: Integer; const Value: TDate);
+begin
+  SetParamText(I, DateToStr(Value, FDB.FFormatSett));
+end;
+
+procedure TSQLitePreparedStatement.SetParamDate(const name: string; const Value: TDate);
+begin
+  SetParamText(name, DateToStr(Value, FDB.FFormatSett));
+end;
+
+procedure TSQLitePreparedStatement.SetParamDateTime(const name: string; const Value: TDateTime);
+begin
+  SetParamText(name, DateTimeToStr(Value, FDB.FFormatSett));
+end;
+
+procedure TSQLitePreparedStatement.SetParamFloat(const I: Integer; value: double);
 var
   par: TSQliteParam;
 begin
@@ -1890,6 +1986,40 @@ begin
   Result := TSQLiteUniTable.Create(FDB, FStmt);
 end;
 
+function TSQLitePreparedStatement.ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean;
+var
+  iStepResult: Integer;
+begin
+  Result := False;
+  try
+    Self.SQL := SQL;
+
+    if FStmt = nil then
+    begin
+      PrepareStatement(SQL);
+    end;
+
+    SetParams(Params);
+
+    iStepResult := Sqlite3_step(FStmt);
+    Result := (iStepResult = SQLITE_DONE);
+    if not Result then
+    begin
+      SQLite3_reset(fstmt);
+      FDB.RaiseError('Error executing SQL statement', FSQL);
+    end;
+
+
+  finally
+    if Assigned(FStmt) then
+    begin
+      Sqlite3_Finalize(FStmt);
+      FStmt := nil;
+      ClearParams;
+    end;
+  end;
+end;
+
 function TSQLitePreparedStatement.ExecSQL(const SQL: string; var RowsAffected: Integer): Boolean;
 begin
   RowsAffected := 0;
@@ -1918,38 +2048,6 @@ end;
 function TSQLitePreparedStatement.ExecQuery(const SQL: string): TSQLiteUniTable;
 begin
   Result := ExecQuery(SQL, []);
-end;
-
-function TSQLitePreparedStatement.ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean;
-var
-  iStepResult: Integer;
-begin
-  Result := False;
-  try
-    if FStmt = nil then
-    begin
-      PrepareStatement(SQL);
-    end;
-
-    SetParams(Params);
-
-    iStepResult := Sqlite3_step(FStmt);
-    Result := (iStepResult = SQLITE_DONE);
-    if not Result then
-    begin
-      SQLite3_reset(fstmt);
-      FDB.RaiseError('Error executing SQL statement', FSQL);
-    end;
-
-
-  finally
-    if Assigned(FStmt) then
-    begin
-      Sqlite3_Finalize(FStmt);
-      FStmt := nil;
-      ClearParams;
-    end;
-  end;
 end;
 
 function TSQLitePreparedStatement.ExecSQLAndMapData<T>(var DataList: TObjectList<T>): Boolean;
@@ -2147,9 +2245,37 @@ begin
   Result := Table.FieldAsBlobText(Index);
 end;
 
+function TSQLiteField.AsBlobTextDef(const Def: string): string;
+begin
+  Result := Def;
+
+  if not IsNull then
+  begin
+    try
+      Result := AsBlobText;
+    except
+      //spawn, because we must always return default value
+    end;
+  end;
+end;
+
 function TSQLiteField.AsDateTime: TDateTime;
 begin
   Result := VarToDateTime(Value);
+end;
+
+function TSQLiteField.AsDateTimeDef(const Def: TDateTime): TDateTime;
+begin
+  Result := Def;
+
+  if not IsNull then
+  begin
+    try
+      Result := AsDateTime;
+    except
+      //spawn, because we must always return default value
+    end;
+  end;
 end;
 
 function TSQLiteField.AsDouble: Double;
@@ -2157,14 +2283,56 @@ begin
   Result := Table.FieldAsDouble(Index);
 end;
 
+function TSQLiteField.AsDoubleDef(const Def: Double): Double;
+begin
+  Result := Def;
+
+  if not IsNull then
+  begin
+    try
+      Result := AsDouble;
+    except
+      //spawn, because we must always return default value
+    end;
+  end;
+end;
+
 function TSQLiteField.AsInteger: Int64;
 begin
   Result := Table.FieldAsInteger(Index);
 end;
 
+function TSQLiteField.AsIntegerDef(const Def: Int64): Int64;
+begin
+  Result := Def;
+
+  if not IsNull then
+  begin
+    try
+      Result := AsInteger;
+    except
+      //spawn, because we must always return default value
+    end;
+  end;
+end;
+
 function TSQLiteField.AsString: string;
 begin
   Result := Table.FieldsAsString[Index];
+end;
+
+function TSQLiteField.AsStringDef(const Def: string): string;
+begin
+  Result := Def;
+
+  if not IsNull then
+  begin
+    try
+      Result := AsString;
+    except
+      //spawn, because we must always return default value
+    end;
+  end;
 end;
 
 constructor TSQLiteField.Create;
@@ -2189,6 +2357,27 @@ function TSQLiteField.Value: Variant;
 begin
   Result := Table.FieldsVal[Index];
 end;
+
+function TSQLiteField.ValueDef(const Def: Variant): Variant;
+begin
+  Result := Def;
+
+  if not IsNull then
+  begin
+    try
+      Result := Value;
+    except
+      //spawn, because we must always return default value
+    end;
+  end;
+end;
+
+initialization
+  TSQLiteDatabase.FColumnTypes := TDictionary<string,Integer>.Create(DEF_COLCOUNT);
+  TSQLiteDatabase.InitDefaultColumnTypes;
+
+finalization
+  TSQLiteDatabase.FColumnTypes.Free;
 
 end.
 
