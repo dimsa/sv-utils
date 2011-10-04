@@ -153,7 +153,7 @@ type
     procedure BindSQL(Query: TSQLiteQuery; const Index: Integer; const Value: Integer); overload;
     procedure BindSQL(Query: TSQLiteQuery; const Index: Integer; const Value: String); overload;
     procedure ReleaseSQL(Query: TSQLiteQuery);
-    function GetUniTable(const SQL: String): TSQLiteUniTable;
+    function GetUniTable(const SQL: String): TSQLiteUniTable; deprecated;
     function GetTableValue(const SQL: String): int64;
     function GetTableString(const SQL: String): string;
     procedure GetTableStrings(const SQL: String; const Value: TStrings);
@@ -257,6 +257,7 @@ type
     function FindParam(const name: string): TSQliteParam; overload;
     function BindParameterCount: Integer;
     procedure SetSQL(const Value: string);
+    function GetParamCount: Integer;
   public
     constructor Create(DB: TSQLiteDatabase); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
@@ -264,6 +265,7 @@ type
     destructor Destroy; override;
 
     procedure ClearParams;
+
     procedure SetParamInt(const name: string; value: int64); overload;
     procedure SetParamFloat(const name: string; value: double); overload;
     procedure SetParamText(const name: string; const value: string); overload;
@@ -293,6 +295,7 @@ type
     property DB: TSQLiteDatabase read FDB;
     property Stmt: TSQLiteStmt read FStmt;
     property SQL: string read FSQL write SetSQL;
+    property ParamCount: Integer read GetParamCount;
     property ParamsBound: Boolean read FParamsBound;
   end;
 
@@ -710,9 +713,17 @@ begin
 end;
 
 function TSQLiteDatabase.GetUniTable(const SQL: string): TSQLiteUniTable;
+var
+  stmt: TSQLitePreparedStatement;
 begin
   Result := nil;
-  Result := TSQLiteUniTable.Create(Self, SQL);
+  stmt := TSQLitePreparedStatement.Create(Self);
+  try
+    Result := stmt.ExecQuery(SQL);
+   // Result := TSQLiteUniTable.Create(Self, SQL);
+  finally
+    stmt.Free;
+  end;
 end;
 
 class procedure TSQLiteDatabase.InitDefaultColumnTypes;
@@ -730,28 +741,34 @@ end;
 function TSQLiteDatabase.GetTableValue(const SQL: string): int64;
 var
   Table: TSQLiteUniTable;
+  stmt: TSQLitePreparedStatement;
 begin
   Result := 0;
-  Table := self.GetUniTable(SQL);
+  stmt := TSQLitePreparedStatement.Create(Self);
+  Table := stmt.ExecQuery(SQL);
   try
     if not Table.EOF then
-      Result := Table.FieldAsInteger(0);
+      Result := Table.Fields[0].AsInteger;
   finally
     Table.Free;
+    stmt.Free;
   end;
 end;
 
 function TSQLiteDatabase.GetTableString(const SQL: string): String;
 var
   Table: TSQLiteUniTable;
+  stmt: TSQLitePreparedStatement;
 begin
   Result := '';
-  Table := self.GetUniTable(SQL);
+  stmt := TSQLitePreparedStatement.Create(Self);
+  Table := stmt.ExecQuery(SQL);
   try
     if not Table.EOF then
-      Result := Table.FieldAsString(0);
+      Result := Table.Fields[0].AsString;
   finally
     Table.Free;
+    stmt.Free;
   end;
 end;
 
@@ -759,9 +776,12 @@ procedure TSQLiteDatabase.GetTableStrings(const SQL: string;
   const Value: TStrings);
 var
   Table: TSQLiteUniTable;
+  stmt: TSQLitePreparedStatement;
 begin
   Value.Clear;
-  Table := self.GetUniTable(SQL);
+  stmt := TSQLitePreparedStatement.Create(Self);
+  Table := stmt.ExecQuery(SQL);
+  Value.BeginUpdate;
   try
     while not table.EOF do
     begin
@@ -769,7 +789,9 @@ begin
       table.Next;
     end;
   finally
+    Value.EndUpdate;
     Table.Free;
+    stmt.Free;
   end;
 end;
 
@@ -1945,9 +1967,9 @@ begin
 
   FSQL := SQL;
 
-  SetParams(Params);
-
   PrepareStatement(SQL);
+
+  SetParams(Params);
 end;
 
 constructor TSQLitePreparedStatement.Create(DB: TSQLiteDatabase; const SQL: string);
@@ -2148,6 +2170,11 @@ begin
   end;
 end;
 
+function TSQLitePreparedStatement.GetParamCount: Integer;
+begin
+  Result := fParams.Count;
+end;
+
 procedure TSQLitePreparedStatement.PrepareStatement(const SQL: string; const Params: array of TVarRec);
 begin
   PrepareStatement(SQL);
@@ -2172,11 +2199,13 @@ begin
   if (SQL <> '') and (SQL <> FSQL) then
     Self.SQL := SQL;
 
-  if Sqlite3_Prepare16_v2(FDB.fDB, PChar(FSQL), -1, fStmt, NextSQLStatement) <> SQLITE_OK then
-    FDB.RaiseError('Error executing SQL', FSQL);
-  if (fStmt = nil) then
-    FDB.RaiseError('Could not prepare SQL statement', FSQL);
-
+ // if ParamCount > 0 then
+ // begin
+    if Sqlite3_Prepare16_v2(FDB.fDB, PChar(FSQL), -1, fStmt, NextSQLStatement) <> SQLITE_OK then
+      FDB.RaiseError('Error executing SQL', FSQL);
+    if (fStmt = nil) then
+      FDB.RaiseError('Could not prepare SQL statement', FSQL);
+ // end;
  // BindParams;
 end;
 
