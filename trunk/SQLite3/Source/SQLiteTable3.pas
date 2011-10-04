@@ -283,6 +283,7 @@ type
     function ExecQuery(const SQL: string; const Params: array of TVarRec): TSQLiteUniTable; overload;
     function ExecSQL(): Boolean; overload;
     function ExecSQL(const SQL: string): Boolean; overload;
+    function ExecSQL(var RowsAffected: Integer): Boolean; overload;
     function ExecSQL(const SQL: string; var RowsAffected: Integer): Boolean; overload;
     function ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean; overload;
 
@@ -1910,6 +1911,9 @@ procedure TSQLitePreparedStatement.SetSQL(const Value: string);
 begin
   if Value <> FSQL then
   begin
+    if (FSQL <> '') and (Value = '') then
+      Exit;
+
     FSQL := Value;
     if BindParameterCount > 0 then
     begin
@@ -2018,6 +2022,11 @@ begin
       ClearParams;
     end;
   end;
+end;
+
+function TSQLitePreparedStatement.ExecSQL(var RowsAffected: Integer): Boolean;
+begin
+  Result := ExecSQL('', RowsAffected);
 end;
 
 function TSQLitePreparedStatement.ExecSQL(const SQL: string; var RowsAffected: Integer): Boolean;
