@@ -41,6 +41,7 @@ type
     procedure TestAddCustomCollate;
     procedure TestAddSystemCollate;
     procedure TestParamsClear;
+    procedure TestAttach;
   end;
   // Test methods for class TSQLiteTable
 
@@ -385,6 +386,23 @@ begin
   // TODO: Validate method results
 end;
 
+procedure TestTSQLiteDatabase.TestAttach;
+var
+  sFile, sName: string;
+  tbl: TSQLiteTable;
+begin
+  sFile := IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'attach16.db';
+  sName := 'ATTACHED';
+  Check(FSQLiteDatabase.Attach(sFile, sName));
+
+  tbl := FSQLiteDatabase.GetTable('select * from ATTACHED.test');
+  try
+    Check(tbl.Count > 0);
+  finally
+    tbl.Free;
+  end;
+end;
+
 procedure TestTSQLiteDatabase.TestParamsClear;
 begin
   FSQLiteDatabase.ParamsClear;
@@ -499,7 +517,7 @@ var
 begin
   ReturnValue := FSQLiteTable.Previous;
   // TODO: Validate method results
-  CheckFalse(ReturnValue);
+  Check(FSQLiteTable.BOF);
 end;
 
 procedure TestTSQLiteTable.TestMoveFirst;
