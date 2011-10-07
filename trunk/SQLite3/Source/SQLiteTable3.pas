@@ -128,7 +128,7 @@ type
     fParams: TList;
     FOnQuery: THookQuery;
     FFormatSett: TFormatSettings;
-
+    FFilename: string;
     procedure RaiseError(const s: string; const SQL: string);
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
@@ -179,6 +179,7 @@ type
     procedure AddParamText(const name: string; const value: string); deprecated;
     procedure AddParamNull(const name: string); deprecated;
 
+    property Filename: string read FFilename;
     /// <summary>
     /// Format settings to use for DateTime fields
     /// </summary>
@@ -372,7 +373,7 @@ type
     property FieldsAsString[I: cardinal]: string read GetFieldsAsString;
     property Fields[I: Integer]: TSQLiteField read GetField write SetField;
     property FieldsVal[I: Cardinal]: Variant read GetFieldsVal write SetFields;
-    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName write SetFieldByName;
+    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName write SetFieldByName; default;
     property FieldByNameAsString[const FieldName: string]: string read GetFieldByNameAsString;
     property FieldIndex[const FieldName: string]: integer read GetFieldIndex;
     property Columns[I: integer]: string read GetColumns;
@@ -436,7 +437,7 @@ var
 begin
   inherited Create;
   fParams := TList.Create;
-
+  FFilename := FileName;
   FFormatSett := TFormatSettings.Create();
   FFormatSett.ShortDateFormat := 'YYYY-MM-DD';
   FFormatSett.DateSeparator := '-';
@@ -520,13 +521,14 @@ var
 begin
 
   Msg := nil;
-
   ret := sqlite3_errcode(self.fDB);
+
   if ret <> SQLITE_OK then
     Msg := sqlite3_errmsg(self.fDB);
 
   if Msg <> nil then
-    raise ESqliteException.CreateFmt(s +'.'#13'Error [%d]: %s.'#13'"%s": %s', [ret, SQLiteErrorStr(ret),SQL, Msg])
+    raise ESqliteException.CreateFmt(s +'.'#13'Error [%d]: %s.'#13'"%s": %s',
+    [ret, SQLiteErrorStr(ret),SQL, Msg])
   else
     raise ESqliteException.CreateFmt(s, [SQL, 'No message']);
 
@@ -779,7 +781,7 @@ var
   stmt: TSQLitePreparedStatement;
 begin
   Value.Clear;
-  stmt := TSQLitePreparedStatement.Create(Self);
+  stmt := TSQLitePreparedStatement.Create(Self, SQL);
   Table := stmt.ExecQuery(SQL);
   Value.BeginUpdate;
   try
@@ -975,6 +977,7 @@ begin
     raise ESqliteException.Create('Could not initialize backup')
   else begin
       try
+
         result := SQLITE3_Backup_Step(pBackup,-1); //copies entire db
       finally
         SQLITE3_backup_finish(pBackup);

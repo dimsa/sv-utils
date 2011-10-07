@@ -155,7 +155,7 @@ var
   ColType, iRes: Integer;
   ColTypeName: string;
 begin
-  ColTypeName := 'bit';
+  ColTypeName := 'BIT';  //uppercase
   ColType := dtInt;
   // TODO: Setup method call parameters
   FSQLiteDatabase.AddNewSupportedColumnType(ColTypeName, ColType);
@@ -196,6 +196,7 @@ var
   SQL: string;
 begin
   // TODO: Setup method call parameters
+  FSQLiteDatabase.ParamsClear;
   SQL := 'update testtable set OtherId = ? where ID = ?';
   ReturnValue := FSQLiteDatabase.PrepareSQL(SQL);
   FSQLiteDatabase.BindSQL(ReturnValue, 1, 101);
@@ -203,9 +204,6 @@ begin
   FSQLiteDatabase.ExecSQL(ReturnValue);
   // TODO: Validate method results
   Check(FSQLiteDatabase.GetLastChangedRows = 1);
-
-  FSQLiteDatabase.ReleaseSQL(ReturnValue);
-  Check(ReturnValue.Statement = nil);
 end;
 
 procedure TestTSQLiteDatabase.TestGetTableValue;
@@ -239,7 +237,7 @@ var
   SQL: string;
 begin
   // TODO: Setup method call parameters
-  SQL := 'select name from testtable limit(1,10)';
+  SQL := 'select name from testtable limit 1,10';
   Value := TStringList.Create;
   try
     FSQLiteDatabase.GetTableStrings(SQL, Value);
@@ -289,7 +287,8 @@ var
 begin
   // TODO: Setup method call parameters
   SQL := 'update testtable set picture = ? where ID = 5';
-  BlobData := TFileStream.Create('Sunset.jpg', fmCreate);
+  BlobData := TFileStream.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'Sunset.jpg',
+   fmOpenRead or fmShareDenyNone);
   try
     FSQLiteDatabase.UpdateBlob(SQL, BlobData);
 
@@ -354,14 +353,14 @@ var
   ReturnValue: Integer;
   TargetDB: TSQLiteDatabase;
 begin
-  TargetDB := TSQLiteDatabase.Create('backup.db');
+  TargetDB := TSQLiteDatabase.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'backup.db');
   try
   // TODO: Setup method call parameters
     ReturnValue := FSQLiteDatabase.Backup(TargetDB);
 
-    Check(ReturnValue = SQLITE_OK);
+    Check(ReturnValue = SQLITE_DONE);
 
-    DeleteFile(IncludeTrailingPathDelimiter(GetCurrentDir) + 'backup.db');
+    DeleteFile(TargetDB.Filename);
   finally
     TargetDB.Free;
   end;
@@ -415,7 +414,7 @@ begin
   I := 0;
   ReturnValue := FSQLiteTable.FieldAsInteger(I);
   // TODO: Validate method results
-  Check(I = 1);
+  Check(ReturnValue = 1);
 end;
 
 procedure TestTSQLiteTable.TestFieldAsBlob;
@@ -425,12 +424,15 @@ var
 begin
   // TODO: Setup method call parameters
   I := 5;
+//  ReturnValue := TMemoryStream.Create;
   ReturnValue := FSQLiteTable.FieldAsBlob(I);
   // TODO: Validate method results
   try
     Check(ReturnValue.Size > 0);
+
+
   finally
-    ReturnValue.Free;
+    //ReturnValue.Free;
   end;
 end;
 
@@ -488,7 +490,7 @@ var
 begin
   ReturnValue := FSQLiteTable.Next;
   // TODO: Validate method results
-  CheckFalse(ReturnValue);
+  Check(FSQLiteTable.EOF);
 end;
 
 procedure TestTSQLiteTable.TestPrevious;
