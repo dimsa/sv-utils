@@ -91,6 +91,8 @@ const
   dtDateTime = 16;
 
 type
+  TSQLiteDBEncoding = (seUTF8, seUTF16);
+
 
   ESQLiteException = class(Exception)
   end;
@@ -137,7 +139,7 @@ type
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
   public
-    constructor Create(const FileName: string);
+    constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8);
     destructor Destroy; override;
      /// <summary>
      /// Adds new supported column type
@@ -178,7 +180,13 @@ type
     procedure AddParamFloat(const name: string; value: double); deprecated;
     procedure AddParamText(const name: string; const value: string); deprecated;
     procedure AddParamNull(const name: string); deprecated;
-
+    /// <summary>
+    /// Attached another database into the current one with the given alias (name)
+    /// </summary>
+    /// <param name="DBFilename">filename of the database to attach</param>
+    /// <param name="AttachedDBName">name of the attached database</param>
+    /// <returns>true; attached succesfully</returns>
+    function Attach(const DBFilename: string; const AttachedDBName: string): Boolean;
     property Filename: string read FFilename;
     /// <summary>
     /// Format settings to use for DateTime fields
@@ -430,14 +438,14 @@ end;
 // TSQLiteDatabase
 //------------------------------------------------------------------------------
 
-constructor TSQLiteDatabase.Create(const FileName: string);
+constructor TSQLiteDatabase.Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding);
 var
   Msg: PAnsiChar;
   iResult: integer;
 begin
   inherited Create;
   fParams := TList.Create;
-  FFilename := FileName;
+  FFilename := AFileName;
   FFormatSett := TFormatSettings.Create();
   FFormatSett.ShortDateFormat := 'YYYY-MM-DD';
   FFormatSett.DateSeparator := '-';
@@ -447,7 +455,12 @@ begin
 
   Msg := nil;
   try
-    iResult := SQLite3_Open16(PChar(FileName), Fdb);
+    case DefaultEncoding of
+      seUTF8: iResult := SQLite3_Open(PAnsiChar(UTF8Encode(AFileName)), Fdb);
+      seUTF16: iResult := SQLite3_Open16(PChar(AFileName), Fdb);
+    end;
+
+
 
 //    iResult := SQLite3_Open(PAnsiChar(AnsiString(FileName)), Fdb);
 
@@ -456,11 +469,11 @@ begin
       begin
         Msg := Sqlite3_ErrMsg(Fdb);
         raise ESqliteException.CreateFmt('Failed to open database "%s" : %s',
-          [FileName, Msg]);
+          [AFileName, Msg]);
       end
       else
         raise ESqliteException.CreateFmt('Failed to open database "%s" : unknown error',
-          [FileName]);
+          [AFileName]);
 
 //set a few configs
 //L.G. Do not call it here. Because busy handler is not setted here,
@@ -521,10 +534,10 @@ var
 begin
 
   Msg := nil;
-  ret := sqlite3_errcode(self.fDB);
+  ret := SQLite3_ErrCode(fDB);
 
   if ret <> SQLITE_OK then
-    Msg := sqlite3_errmsg(self.fDB);
+    Msg := sqlite3_errmsg(fDB);
 
   if Msg <> nil then
     raise ESqliteException.CreateFmt(s +'.'#13'Error [%d]: %s.'#13'"%s": %s',
@@ -563,10 +576,10 @@ begin
 
     iStepResult := Sqlite3_step(Stmt);
     if (iStepResult <> SQLITE_DONE) then
-      begin
+    begin
       SQLite3_reset(stmt);
       RaiseError('Error executing SQL statement', SQL);
-      end;
+    end;
   finally
     if Assigned(Stmt) then
       Sqlite3_Finalize(stmt);
@@ -857,6 +870,19 @@ begin
   {$IFDEF WIN32}
   sqlite3_create_collation16(fdb, 'SYSTEM', SQLITE_UTF16LE, nil, @SystemCollate);
   {$ENDIF}
+end;
+
+function TSQLiteDatabase.Attach(const DBFilename, AttachedDBName: string): Boolean;
+var
+  stmt: TSQLitePreparedStatement;
+begin
+  Result := False;
+  stmt := GetPreparedStatement('ATTACH DATABASE ? AS ?', [DBFilename, AttachedDBName]);
+  try
+    Result := stmt.ExecSQL;
+  finally
+    stmt.Free;
+  end;
 end;
 
 procedure TSQLiteDatabase.ParamsClear;

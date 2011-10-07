@@ -395,7 +395,8 @@ begin
       SQLite3_Close := LoadProc('sqlite3_close');
       SQLite3_Exec := LoadProc('sqlite3_exec');
       SQLite3_Version := LoadProc('sqlite3_libversion');
-      SQLite3_ErrMsg := LoadProc('sqlite3_errcode');
+      SQLite3_ErrMsg := LoadProc('sqlite3_errmsg');
+      SQLite3_ErrCode := LoadProc('sqlite3_errcode');
       SQlite3_Free := LoadProc('sqlite3_free');
       SQLite3_GetTable := LoadProc('sqlite3_get_table');
       SQLite3_FreeTable := LoadProc('sqlite3_free_table');
