@@ -43,6 +43,7 @@ type
     procedure TestParamsClear;
     procedure TestAttach;
     procedure TestMemoryUsed;
+    procedure TestFunctions;
   end;
   // Test methods for class TSQLiteTable
 
@@ -190,6 +191,58 @@ begin
   FSQLiteDatabase.ExecSQL(SQL);
   // TODO: Validate method results
   Check(FSQLiteDatabase.GetLastChangedRows = 1);
+end;
+
+procedure TestTSQLiteDatabase.TestFunctions;
+var
+  stmt: TSQLitePreparedStatement;
+  tbl: TSQLiteUniTable;
+  iVal: Double;
+  iInt: Integer;
+begin
+  FSQLiteDatabase.Functions.AddFunction('TestAbs', 1,
+    procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar)
+    begin
+      case TSQLiteFunctions.GetValueType(ArgValue) of
+        SQLITE_INTEGER:
+        begin
+          TSQLiteFunctions.ResultAsInteger(sqlite3_context,
+            Abs(TSQLiteFunctions.ValueAsInteger(ArgValue)));
+        end;
+        SQLITE_NULL:
+        begin
+          TSQLiteFunctions.ResultAsNull(sqlite3_context);
+        end;
+        SQLITE_FLOAT:
+        begin
+          iVal := Abs(TSQLiteFunctions.ValueAsFloat(ArgValue));
+          TSQLiteFunctions.ResultAsFloat(sqlite3_context, iVal);
+        end;
+        else
+        begin
+          iInt := Abs(TSQLiteFunctions.ValueAsInteger(ArgValue));
+          TSQLiteFunctions.ResultAsInteger(sqlite3_context, iInt);
+        end;
+      end;
+    end);
+
+  stmt := FSQLiteDatabase.GetPreparedStatement('select TestAbs(-1) from testtable');
+  try
+    Check(Assigned(stmt));
+    if Assigned(stmt) then
+    begin
+      tbl := stmt.ExecQuery;
+      try
+        iVal := tbl.Fields[0].AsDouble;
+        Check(iVal = 1);
+      finally
+        tbl.Free;
+      end;
+
+    end;
+  finally
+    stmt.Free;
+  end;
 end;
 
 procedure TestTSQLiteDatabase.TestPrepareSQL;
