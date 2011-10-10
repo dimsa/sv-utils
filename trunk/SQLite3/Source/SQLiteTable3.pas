@@ -1036,6 +1036,8 @@ var
   DeclaredColType: PChar;
   ActualColType: integer;
   ptrValue: PChar;
+  sColType: string;
+  iColType: Integer;
 begin
   inherited create;
   try
@@ -1063,9 +1065,12 @@ begin
               fCols := TStringList.Create;
               fColTypes := TList.Create;
               fColCount := SQLite3_ColumnCount(stmt);
-              for i := 0 to Pred(fColCount) do begin
-                fCols.Add(UpperCase(Sqlite3_ColumnName16(stmt, i)));
+
+              for i := 0 to Pred(fColCount) do
+              begin
+                fCols.Add(AnsiUpperCase(Sqlite3_ColumnName16(stmt, i)));
               end;
+
               for i := 0 to Pred(fColCount) do
               begin
                 new(thisColType);
@@ -1074,7 +1079,20 @@ begin
                   thisColType^ := Sqlite3_ColumnType(stmt, i) //use the actual column type instead
                 //seems to be needed for last_insert_rowid
                 else
-                  if (DeclaredColType = 'INTEGER') or (DeclaredColType = 'BOOLEAN') then
+                begin
+                  sColType :=  AnsiUpperCase(DeclaredColType);
+
+                  if TSQLiteDatabase.FColumnTypes.TryGetValue(sColType, iColType) then
+                  begin
+                    thisColType^ := iColType;
+                  end
+                  else
+                  begin
+                    thisColType^ := dtStr;
+                  end;
+
+                end;
+                 { if (DeclaredColType = 'INTEGER') or (DeclaredColType = 'BOOLEAN') then
                     thisColType^ := dtInt
                   else
                     if (DeclaredColType = 'NUMERIC') or
@@ -1086,7 +1104,7 @@ begin
                       if DeclaredColType = 'BLOB' then
                         thisColType^ := dtBlob
                       else
-                        thisColType^ := dtStr;
+                        thisColType^ := dtStr; }
                 fColTypes.Add(thiscoltype);
               end;
               fResults := TList.Create;
