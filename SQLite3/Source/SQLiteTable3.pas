@@ -119,6 +119,34 @@ type
   TSQLiteTable = class;
   TSQLiteUniTable = class;
   TSQLitePreparedStatement = class;
+  TSQLiteDatabase = class;
+  TSQLiteFunctions = class;
+
+  TSQLiteUserFunc = reference to procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar);
+
+
+  TSQLiteFunctions = class
+  private
+    FDB: TSQLiteDatabase;
+    FList: TDictionary<string,TSQLiteUserFunc>;
+  public
+    constructor Create(DB: TSQLiteDatabase); virtual;
+    destructor Destroy; override;
+
+    class function GetValueType(ArgValue: PPChar): Integer;
+    class function ValueAsInteger(ArgValue: PPChar): Int64;
+    class function ValueAsString(ArgValue: PPChar): string;
+    class function ValueAsFloat(ArgValue: PPChar): Double;
+
+    class procedure ResultAsNull(sqlite3_context: Pointer);
+    class procedure ResultAsInteger(sqlite3_context: Pointer; Val: Int64);
+    class procedure ResultAsString(sqlite3_context: Pointer; Val: string);
+    class procedure ResultAsFloat(sqlite3_context: Pointer; Val: Double);
+
+    procedure AddFunction(const FuncName: AnsiString; ArgCount: Integer;
+      AFunc: TSQLiteUserFunc);
+  end;
+
 
   /// <summary>
   /// SQLite database class
@@ -134,6 +162,7 @@ type
     FOnQuery: THookQuery;
     FFormatSett: TFormatSettings;
     FFilename: string;
+    FFunctions: TSQLiteFunctions;
     procedure RaiseError(const s: string; const SQL: string);
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
@@ -249,6 +278,7 @@ type
     property DB: TSQLiteDB read fDB;
   published
     property IsTransactionOpen: boolean read fInTrans;
+    property Functions: TSQLiteFunctions read FFunctions;
     //database rows that were changed (or inserted or deleted) by the most recent SQL statement
     property RowsChanged : integer read getRowsChanged;
     property Synchronised: boolean read FSync write SetSynchronised;
@@ -500,10 +530,58 @@ const
      dtDateTime, dtDate, dtBlob
     );
 
+type
+  TSQLiteVal = record
+    Funcs: TSQLiteFunctions;
+    FuncName: string;
+  end;
+
+  PSQLiteVal = ^TSQLiteVal;
+
 procedure DisposePointer(ptr: pointer); cdecl;
 begin
   if assigned(ptr) then
     freemem(ptr);
+end;
+
+procedure TestFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPChar); cdecl;
+var
+  iVal: Int64;
+  iDoub: Double;
+  Funcs: PSQLiteVal;
+  UserFunc: TSQLiteUserFunc;
+begin
+  Funcs := PSQLiteVal(sqlite3_user_data(sqlite3_context));
+  if Assigned(Funcs) then
+  begin
+    if Funcs.Funcs.FList.TryGetValue(Funcs.FuncName, UserFunc) then
+    begin
+      if Assigned(UserFunc) then
+        UserFunc(sqlite3_context, cArg, ArgV);
+    end;
+  end;
+
+//  MyProc := TProc(sqlite3_user_data(sqlite3_context));
+  //Assert(cArg = 1, 'Too many arguments');
+{  case sqlite3_value_type(ArgV) of
+    SQLITE_INTEGER:
+    begin
+      iVal := Abs(sqlite3_value_int64(ArgV^));
+
+      sqlite3_result_int64(sqlite3_context, iVal);
+    end;
+    SQLITE_NULL:
+    begin
+      sqlite3_result_null(sqlite3_context);
+    end;
+    else
+    begin
+      //sqlite3_value_text
+      iDoub := Abs(sqlite3_value_double(ArgV^));
+      sqlite3_result_double(sqlite3_context, iDoub);
+
+    end;
+  end; }
 end;
 
 {$IFDEF WIN32}
@@ -531,7 +609,7 @@ begin
   FFormatSett.ShortDateFormat := 'YYYY-MM-DD';
   FFormatSett.DateSeparator := '-';
   FFormatSett.LongDateFormat := FFormatSett.ShortDateFormat + ' HH:MM:SS';
-
+  FFunctions := TSQLiteFunctions.Create(Self);
   self.fInTrans := False;
 
   Msg := nil;
@@ -580,6 +658,7 @@ begin
     SQLite3_Close(fDB);
   ParamsClear;
   fParams.Free;
+  FFunctions.Free;
   inherited;
 end;
 
@@ -2541,6 +2620,77 @@ begin
       //spawn, because we must always return default value
     end;
   end;
+end;
+
+{ TSQLiteFunctions }
+
+procedure TSQLiteFunctions.AddFunction(const FuncName: AnsiString; ArgCount: Integer;
+  AFunc: TSQLiteUserFunc);
+var
+  iRes: Integer;
+  Val: PSQLiteVal;
+begin
+  New(Val);
+  Val.FuncName := UpperCase(FuncName);
+  Val.Funcs := Self;
+  FList.AddOrSetValue(Val.FuncName, AFunc);
+
+  iRes := sqlite3_create_function(FDB.fDB, PAnsiChar(FuncName), ArgCount, SQLITE_ANY,
+    Val, @TestFunc, nil, nil);
+end;
+
+constructor TSQLiteFunctions.Create(DB: TSQLiteDatabase);
+begin
+  inherited Create();
+  FDB := DB;
+  FList := TDictionary<string, TSQLiteUserFunc>.Create;
+end;
+
+destructor TSQLiteFunctions.Destroy;
+begin
+  FList.Free;
+  FDB := nil;
+  inherited;
+end;
+
+class function TSQLiteFunctions.GetValueType(ArgValue: PPChar): Integer;
+begin
+  Result := sqlite3_value_type(ArgValue^);
+end;
+
+class procedure TSQLiteFunctions.ResultAsFloat(sqlite3_context: Pointer; Val: Double);
+begin
+  sqlite3_result_double(sqlite3_context, Val);
+end;
+
+class procedure TSQLiteFunctions.ResultAsInteger(sqlite3_context: Pointer; Val: Int64);
+begin
+  sqlite3_result_int64(sqlite3_context, Val);
+end;
+
+class procedure TSQLiteFunctions.ResultAsNull(sqlite3_context: Pointer);
+begin
+  sqlite3_result_null(sqlite3_context);
+end;
+
+class procedure TSQLiteFunctions.ResultAsString(sqlite3_context: Pointer; Val: string);
+begin
+  sqlite3_result_text16(sqlite3_context, PChar(Val), -1, nil);
+end;
+
+class function TSQLiteFunctions.ValueAsFloat(ArgValue: PPChar): Double;
+begin
+  Result := sqlite3_value_double(ArgValue^);
+end;
+
+class function TSQLiteFunctions.ValueAsInteger(ArgValue: PPChar): Int64;
+begin
+  Result := sqlite3_value_int64(ArgValue^);
+end;
+
+class function TSQLiteFunctions.ValueAsString(ArgValue: PPChar): string;
+begin
+  Result := sqlite3_value_text16(ArgValue^);
 end;
 
 initialization
