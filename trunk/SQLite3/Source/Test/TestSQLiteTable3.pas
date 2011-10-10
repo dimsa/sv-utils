@@ -227,7 +227,7 @@ begin
       end;
     end);
 
-  stmt := FSQLiteDatabase.GetPreparedStatement('select TestAbs(Number) from testtable');
+  stmt := FSQLiteDatabase.GetPreparedStatement('select TestAbs(-5) from testtable');
   try
     Check(Assigned(stmt));
     if Assigned(stmt) then
@@ -506,16 +506,23 @@ procedure TestTSQLiteDatabase.TestAttach;
 var
   sFile, sName: string;
   tbl: TSQLiteTable;
+  SDB: TSQLiteDatabase;
 begin
   sFile := IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'attach16.db';
-  sName := 'ATTACHED';
-  Check(FSQLiteDatabase.Attach(sFile, sName));
-
-  tbl := FSQLiteDatabase.GetTable('select * from ATTACHED.test');
+  SDB := TSQLiteDatabase.Create(sFile, seUTF16);
+  SDB.ExecSQL('CREATE TABLE IF NOT EXISTS test ([ID] INTEGER PRIMARY KEY,[OtherID] INTEGER NULL,[Name] VARCHAR (255),'+
+  '[Number] FLOAT, [notes] BLOB, [picture] BLOB COLLATE NOCASE);');
   try
+    SDB.ExecSQL('INSERT INTO test (NAME) VALUES (''test'')');
+    sName := 'ATTACHED';
+    Check(FSQLiteDatabase.Attach(sFile, sName));
+  //  Check(FSQLiteDatabase.TableExists('test'));
+    tbl := FSQLiteDatabase.GetTable('select * from ATTACHED.test');
+
     Check(tbl.Count > 0);
   finally
     tbl.Free;
+    SDB.Free;
   end;
 end;
 
