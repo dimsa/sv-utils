@@ -123,12 +123,29 @@ type
   TSQLiteFunctions = class;
 
   TSQLiteUserFunc = reference to procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar);
+  TSQLiteUserFuncFinal = reference to procedure(sqlite3_context: Psqlite3_context);
 
 
+  TSQLiteFuncType = (sftScalar, sftAggregate);
+
+  TSQLiteFuncs = record
+    Funcs: TSQLiteFunctions;
+    AFunc: TSQLiteUserFunc;
+    AStepFunc: TSQLiteUserFunc;
+    AFinalFunc: TSQLiteUserFuncFinal;
+    FuncType: TSQLiteFuncType;
+    FuncName: string;
+  end;
+
+  PSQLiteFuncs = ^TSQLiteFuncs;
+
+  /// <summary>
+  /// User defined SQLite functions
+  /// </summary>
   TSQLiteFunctions = class
   private
     FDB: TSQLiteDatabase;
-    FList: TDictionary<string,TSQLiteUserFunc>;
+    FVals: TList<PSQLiteFuncs>;
   public
     constructor Create(DB: TSQLiteDatabase); virtual;
     destructor Destroy; override;
@@ -143,8 +160,11 @@ type
     class procedure ResultAsString(sqlite3_context: Pointer; Val: string);
     class procedure ResultAsFloat(sqlite3_context: Pointer; Val: Double);
 
-    procedure AddFunction(const FuncName: AnsiString; ArgCount: Integer;
+    procedure AddScalarFunction(const FuncName: AnsiString; ArgCount: Integer;
       AFunc: TSQLiteUserFunc);
+    procedure AddAggregateFunction(const FuncName: AnsiString; ArgCount: Integer;
+      AStepFunc: TSQLiteUserFunc; AFinalFunc: TSQLiteUserFuncFinal) ;
+    procedure Clear;
   end;
 
 
@@ -530,13 +550,19 @@ const
      dtDateTime, dtDate, dtBlob
     );
 
-type
-  TSQLiteVal = record
+{type
+  TSQLiteFuncType = (sftScalar, sftAggregate);
+
+  TSQLiteFuncs = record
     Funcs: TSQLiteFunctions;
+    AFunc: TSQLiteUserFunc;
+    AStepFunc: TSQLiteUserFunc;
+    AFinalFunc: TSQLiteUserFuncFinal;
+    FuncType: TSQLiteFuncType;
     FuncName: string;
   end;
 
-  PSQLiteVal = ^TSQLiteVal;
+  PSQLiteFuncs = ^TSQLiteFuncs; }
 
 procedure DisposePointer(ptr: pointer); cdecl;
 begin
@@ -544,20 +570,56 @@ begin
     freemem(ptr);
 end;
 
-procedure TestFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPChar); cdecl;
+
+procedure AggFinalDefFunc(sqlite3_context: Psqlite3_context); cdecl;
 var
-  iVal: Int64;
-  iDoub: Double;
-  Funcs: PSQLiteVal;
-  UserFunc: TSQLiteUserFunc;
+  Funcs: PSQLiteFuncs;
+  UserFunc: TSQLiteUserFuncFinal;
 begin
-  Funcs := PSQLiteVal(sqlite3_user_data(sqlite3_context));
+  Funcs := PSQLiteFuncs(sqlite3_user_data(sqlite3_context));
   if Assigned(Funcs) then
   begin
-    if Funcs.Funcs.FList.TryGetValue(Funcs.FuncName, UserFunc) then
-    begin
-      if Assigned(UserFunc) then
-        UserFunc(sqlite3_context, cArg, ArgV);
+    UserFunc := Funcs.AFinalFunc;
+    if Assigned(UserFunc) then
+      UserFunc(sqlite3_context);
+  end;
+end;
+
+procedure AggStepDefFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPChar); cdecl;
+var
+  Funcs: PSQLiteFuncs;
+  UserFunc: TSQLiteUserFunc;
+begin
+  Funcs := PSQLiteFuncs(sqlite3_user_data(sqlite3_context));
+  if Assigned(Funcs) then
+  begin
+    UserFunc := Funcs.AStepFunc;
+    if Assigned(UserFunc) then
+      UserFunc(sqlite3_context, cArg, ArgV);
+  end;
+end;
+
+procedure ScalarDefFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPChar); cdecl;
+var
+  Funcs: PSQLiteFuncs;
+  UserFunc: TSQLiteUserFunc;
+begin
+  Funcs := PSQLiteFuncs(sqlite3_user_data(sqlite3_context));
+  if Assigned(Funcs) then
+  begin
+    case Funcs.FuncType of
+      sftScalar:
+      begin
+        UserFunc := Funcs.AFunc;
+        if Assigned(UserFunc) then
+          UserFunc(sqlite3_context, cArg, ArgV);
+      end;
+      sftAggregate: 
+      begin
+        UserFunc := Funcs.AFunc;
+        if Assigned(UserFunc) then
+          UserFunc(sqlite3_context, cArg, ArgV);
+      end;
     end;
   end;
 
@@ -2624,31 +2686,77 @@ end;
 
 { TSQLiteFunctions }
 
-procedure TSQLiteFunctions.AddFunction(const FuncName: AnsiString; ArgCount: Integer;
-  AFunc: TSQLiteUserFunc);
+procedure TSQLiteFunctions.AddAggregateFunction(const FuncName: AnsiString; ArgCount: Integer; 
+  AStepFunc: TSQLiteUserFunc; AFinalFunc: TSQLiteUserFuncFinal);
 var
   iRes: Integer;
-  Val: PSQLiteVal;
+  Val: PSQLiteFuncs;
 begin
   New(Val);
   Val.FuncName := UpperCase(FuncName);
   Val.Funcs := Self;
-  FList.AddOrSetValue(Val.FuncName, AFunc);
+  Val.AFunc := nil;
+  Val.AStepFunc := AStepFunc;
+  Val.AFinalFunc := AFinalFunc;
+  Val.FuncType := sftScalar;
+  FVals.Add(Val);
 
   iRes := sqlite3_create_function(FDB.fDB, PAnsiChar(FuncName), ArgCount, SQLITE_ANY,
-    Val, @TestFunc, nil, nil);
+    Val, nil, @AggStepDefFunc, @AggFinalDefFunc);
+
+  if iRes <> SQLITE_OK then
+  begin
+    FDB.RaiseError('Cannot add aggregate function ' + FuncName,'');
+  end;  
+end;
+
+procedure TSQLiteFunctions.AddScalarFunction(const FuncName: AnsiString; ArgCount: Integer;
+  AFunc: TSQLiteUserFunc);
+var
+  iRes: Integer;
+  Val: PSQLiteFuncs;
+begin
+  New(Val);
+  Val.FuncName := UpperCase(FuncName);
+  Val.Funcs := Self;
+  Val.AFunc := AFunc;
+  Val.AStepFunc := nil;
+  Val.AFinalFunc := nil;
+  Val.FuncType := sftScalar;
+  FVals.Add(Val);
+
+  iRes := sqlite3_create_function(FDB.fDB, PAnsiChar(FuncName), ArgCount, SQLITE_ANY,
+    Val, @ScalarDefFunc, nil, nil);
+  if iRes <> SQLITE_OK then
+  begin
+    FDB.RaiseError('Cannot add scalar function ' + FuncName,'');
+  end;
+end;
+
+procedure TSQLiteFunctions.Clear;
+var
+  Val: PSQLiteFuncs;
+begin
+  for Val in FVals do
+  begin
+   // sqlite3_create_function(FDB.fDB, PAnsiChar(Val.FuncName), 0, SQLITE_ANY,
+  //    nil, nil, nil, nil);
+    Dispose(Val);  
+  end;
+  FVals.Clear;
 end;
 
 constructor TSQLiteFunctions.Create(DB: TSQLiteDatabase);
 begin
   inherited Create();
   FDB := DB;
-  FList := TDictionary<string, TSQLiteUserFunc>.Create;
+  FVals := TList<PSQLiteFuncs>.Create;
 end;
 
 destructor TSQLiteFunctions.Destroy;
 begin
-  FList.Free;
+  Clear;
+  FVals.Free;
   FDB := nil;
   inherited;
 end;

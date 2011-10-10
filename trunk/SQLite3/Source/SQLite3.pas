@@ -239,6 +239,8 @@ cdecl; // 'sqlite3_bind_text';
     cdecl; // 'sqlite3_result_value';
   sqlite3_user_data: function(sqlite3_context: Psqlite3_context): Pointer; cdecl;
   //void *sqlite3_user_data(sqlite3_context*);
+  sqlite3_aggregate_context: function(sqlite3_context: Psqlite3_context; nBytes: Integer): Pointer; cdecl;
+  //void *sqlite3_aggregate_context(sqlite3_context*, int nBytes);
 
   sqlite3_value_blob: function(value: pointer): Pointer;
     cdecl; // 'sqlite3_value_blob';
@@ -462,6 +464,7 @@ begin
 
       sqlite3_create_function := LoadProc('sqlite3_create_function');
       sqlite3_result_blob := LoadProc('sqlite3_result_blob');
+      sqlite3_result_double := LoadProc('sqlite3_result_double');
       sqlite3_result_error := LoadProc('sqlite3_result_error');
       sqlite3_result_error16 := LoadProc('sqlite3_result_error16');
       sqlite3_result_int := LoadProc('sqlite3_result_int');
@@ -473,6 +476,7 @@ begin
       sqlite3_result_text16le := LoadProc('sqlite3_result_text16le');
       sqlite3_result_value := LoadProc('sqlite3_result_value');
       sqlite3_user_data := LoadProc('sqlite3_user_data');
+      sqlite3_aggregate_context := LoadProc('sqlite3_aggregate_context');
 
       sqlite3_value_blob := LoadProc('sqlite3_value_blob');
       sqlite3_value_bytes := LoadProc('sqlite3_value_bytes');
