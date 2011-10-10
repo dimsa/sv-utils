@@ -42,6 +42,7 @@ type
     procedure TestAddSystemCollate;
     procedure TestParamsClear;
     procedure TestAttach;
+    procedure TestMemoryUsed;
   end;
   // Test methods for class TSQLiteTable
 
@@ -218,6 +219,15 @@ begin
 
   Check(ReturnValue = 1);
   // TODO: Validate method results
+end;
+
+procedure TestTSQLiteDatabase.TestMemoryUsed;
+var
+  iMem: Int64;
+begin
+  iMem := 0;
+  iMem := FSQLiteDatabase.GetMemoryUsed;
+  Check(iMem > 0);
 end;
 
 procedure TestTSQLiteDatabase.TestGetTableString;

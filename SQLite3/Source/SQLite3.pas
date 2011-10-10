@@ -131,6 +131,8 @@ var
   SQLite3_ColumnDeclType16: function(hStmt: TSqliteStmt; ColNum: integer): PChar; cdecl; // 'sqlite3_column_decltype16';
   SQLite3_Step: function(hStmt: TSqliteStmt): integer; cdecl; // 'sqlite3_step';
   SQLite3_DataCount: function(hStmt: TSqliteStmt): integer; cdecl; // 'sqlite3_data_count';
+  sqlite3_memory_used: function(): Int64; cdecl; // sqlite3_memory_used
+
 
   SQLite3_ColumnBlob: function(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; // 'sqlite3_column_blob';
   SQLite3_ColumnBytes: function(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; // 'sqlite3_column_bytes';
@@ -432,6 +434,7 @@ begin
       SQLite3_ColumnDeclType16 := LoadProc('sqlite3_column_decltype16');
       SQLite3_Step := LoadProc('sqlite3_step');
       SQLite3_DataCount := LoadProc('sqlite3_data_count');
+      sqlite3_memory_used := LoadProc('sqlite3_memory_used');
       SQLite3_ColumnBlob := LoadProc('sqlite3_column_blob');
       SQLite3_ColumnBytes := LoadProc('sqlite3_column_bytes');
       SQLite3_ColumnBytes16 := LoadProc('sqlite3_column_bytes16');
