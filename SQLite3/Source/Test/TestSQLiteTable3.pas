@@ -44,6 +44,7 @@ type
     procedure TestAttach;
     procedure TestMemoryUsed;
     procedure TestFunctions;
+    procedure TestFunctions2;
   end;
   // Test methods for class TSQLiteTable
 
@@ -200,7 +201,7 @@ var
   iVal: Double;
   iInt: Integer;
 begin
-  FSQLiteDatabase.Functions.AddFunction('TestAbs', 1,
+  FSQLiteDatabase.Functions.AddScalarFunction('TestAbs', 1,
     procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar)
     begin
       case TSQLiteFunctions.GetValueType(ArgValue) of
@@ -226,7 +227,7 @@ begin
       end;
     end);
 
-  stmt := FSQLiteDatabase.GetPreparedStatement('select TestAbs(-1) from testtable');
+  stmt := FSQLiteDatabase.GetPreparedStatement('select TestAbs(Number) from testtable');
   try
     Check(Assigned(stmt));
     if Assigned(stmt) then
@@ -234,7 +235,7 @@ begin
       tbl := stmt.ExecQuery;
       try
         iVal := tbl.Fields[0].AsDouble;
-        Check(iVal = 1);
+        Check(iVal > 0);
       finally
         tbl.Free;
       end;
@@ -242,6 +243,58 @@ begin
     end;
   finally
     stmt.Free;
+  end;
+end;
+
+procedure TestTSQLiteDatabase.TestFunctions2;
+var
+  stmt, stmt2: TSQLitePreparedStatement;
+  tbl, tbl2: TSQLiteUniTable;
+  iVal, iVal2, iVal3: Double;
+  iInt: Integer;
+begin
+  iVal := 0;
+  FSQLiteDatabase.Functions.AddAggregateFunction('TestSum', 1,
+    procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar)
+    begin
+      case TSQLiteFunctions.GetValueType(ArgValue) of
+        SQLITE_NULL:
+        begin
+          TSQLiteFunctions.ResultAsNull(sqlite3_context);
+        end;
+        SQLITE_FLOAT:
+        begin
+          iVal := iVal + TSQLiteFunctions.ValueAsFloat(ArgValue);
+        end;
+      end;
+    end,
+    procedure(sqlite3_context: Psqlite3_context)
+    begin
+      TSQLiteFunctions.ResultAsFloat(sqlite3_context, iVal);
+    end);
+
+  stmt := FSQLiteDatabase.GetPreparedStatement('select TestSum(Number) AS NUMBER1 from testtable');
+  stmt2 := FSQLiteDatabase.GetPreparedStatement('select Sum(Number) AS NUMBER1 from testtable');
+  try
+    Check(Assigned(stmt));
+    if Assigned(stmt) then
+    begin
+      tbl := stmt.ExecQuery;
+      tbl2 := stmt2.ExecQuery;
+      try
+        iVal3 := tbl.FieldByName['NUMBER1'].AsDouble;
+        iVal2 := tbl2.FieldByName['NUMBER1'].AsDouble;
+
+        Check(iVal3 = iVal2);
+      finally
+        tbl.Free;
+        tbl2.Free;
+      end;
+
+    end;
+  finally
+    stmt.Free;
+    stmt2.Free;
   end;
 end;
 
