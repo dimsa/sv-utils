@@ -120,6 +120,9 @@ type
   TSQLiteUniTable = class;
   TSQLitePreparedStatement = class;
 
+  /// <summary>
+  /// SQLite database class
+  /// </summary>
   TSQLiteDatabase = class
   class var
     FColumnTypes: TDictionary<string,Integer>;
@@ -139,6 +142,11 @@ type
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
   public
+    /// <summary>
+    /// Creates (if file doesn't exist) or loads database from given file using default encoding
+    /// </summary>
+    /// <param name="AFileName">filename of sqlite database</param>
+    /// <param name="DefaultEncoding">encoding to use when creating new database</param>
     constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8);
     destructor Destroy; override;
      /// <summary>
@@ -147,8 +155,16 @@ type
      /// <param name="ColTypeName">Column Type Name</param>
      /// <param name="ColType">Column Type constant, e.g. dtStr</param>
     class procedure AddNewSupportedColumnType(const ColTypeName: string; ColType: Integer = dtStr);
-
+    /// <summary>
+    /// Executes sql statement and returns table with results
+    /// </summary>
+    /// <param name="SQL">SQL statement which should return resultset</param>
+    /// <returns>TSQLiteTable instance</returns>
     function GetTable(const SQL: String): TSQLiteTable;
+    /// <summary>
+    /// Executes SQL statement
+    /// </summary>
+    /// <param name="SQL">SQL statement which should not return resultset</param>
     procedure ExecSQL(const SQL: String); overload;
     procedure ExecSQL(Query: TSQLiteQuery); overload;
     function PrepareSQL(const SQL: String): TSQLiteQuery;
@@ -160,14 +176,52 @@ type
     function GetTableString(const SQL: String): string;
     procedure GetTableStrings(const SQL: String; const Value: TStrings);
     function GetPreparedStatement(const SQL: string): TSQLitePreparedStatement; overload;
+    /// <summary>
+    /// returns newly created prepared statment
+    /// </summary>
+    /// <param name="SQL">SQL statement string</param>
+    /// <param name="Params">Parameter values for prepared query</param>
+    /// <returns>TSQLitePreparedStatement instance</returns>
     function GetPreparedStatement(const SQL: string; const Params: array of TVarRec): TSQLitePreparedStatement; overload;
+    /// <summary>
+    /// Update blob value. Expects SQL of the form 'UPDATE MYTABLE SET MYFIELD = ? WHERE MYKEY = 1'
+    /// </summary>
+    /// <param name="SQL">update statement</param>
+    /// <param name="BlobData">BlobData stream</param>
     procedure UpdateBlob(const SQL: String; BlobData: TStream);
+    /// <summary>
+    /// Starts new transaction. Speeds up drastically data inserts, updates, deletes.
+    /// </summary>
     procedure BeginTransaction;
+    /// <summary>
+    /// Commits transaction changes to database
+    /// </summary>
     procedure Commit;
+    /// <summary>
+    /// Rollbacks transaction changes to database
+    /// </summary>
     procedure Rollback;
+    /// <summary>
+    /// Checks if given table exists in the database
+    /// </summary>
+    /// <param name="TableName">Table name</param>
+    /// <returns>Boolean</returns>
     function TableExists(const TableName: string): boolean;
+    /// <summary>
+    /// Returns last inserted rows ID (for autoincrement fields it is that field value)
+    /// </summary>
+    /// <returns></returns>
     function GetLastInsertRowID: int64;
-    function GetLastChangedRows: int64;
+    /// <summary>
+    /// How many rows changes since the last database change
+    /// </summary>
+    /// <returns>Number of rows Integer</returns>
+    function GetLastChangedRows: Integer;
+    /// <summary>
+    /// Returns sqlite memory usage
+    /// </summary>
+    /// <returns>Memory used in bytes</returns>
+    function GetMemoryUsed: Int64;
     procedure SetTimeout(Value: integer);
     function Backup(TargetDB: TSQLiteDatabase): integer; Overload;
     function Backup(TargetDB: TSQLiteDatabase; const targetName: String; const sourceName: String): integer; Overload;
@@ -202,6 +256,9 @@ type
 
   end;
 
+  /// <summary>
+  /// SQLite table which holds all the data in memory
+  /// </summary>
   TSQLiteTable = class
   private
     fResults: TList;
@@ -288,16 +345,30 @@ type
     procedure SetParamDate(const I: Integer; const Value: TDate); overload;
     procedure SetParamDate(const name: string; const Value: TDate); overload;
 
+    /// <summary>
+    /// Executes previously set SQL statement and fetches results into given class type
+    /// </summary>
     function ExecSQLAndMapData<T: constructor, class>(var DataList: TObjectList<T>): Boolean;
+    /// <summary>
+    /// Executes query which returns unidirectional table
+    /// </summary>
+    /// <returns>TSQLiteUniTable instance</returns>
     function ExecQuery(): TSQLiteUniTable; overload;
     function ExecQuery(const SQL: string): TSQLiteUniTable; overload;
     function ExecQuery(const SQL: string; const Params: array of TVarRec): TSQLiteUniTable; overload;
+    /// <summary>
+    /// Executes SQL statement which should not return resultset
+    /// </summary>
+    /// <returns></returns>
     function ExecSQL(): Boolean; overload;
     function ExecSQL(const SQL: string): Boolean; overload;
     function ExecSQL(var RowsAffected: Integer): Boolean; overload;
     function ExecSQL(const SQL: string; var RowsAffected: Integer): Boolean; overload;
     function ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean; overload;
-
+    /// <summary>
+    /// Prepares new SQL statement. Useful when using same TSQLitePreparedStatement with different queries
+    /// </summary>
+    /// <param name="SQL">SQL statement</param>
     procedure PrepareStatement(const SQL: string = ''); overload;
     procedure PrepareStatement(const SQL: string; const Params: array of TVarRec); overload;
 
@@ -308,6 +379,9 @@ type
     property ParamsBound: Boolean read FParamsBound;
   end;
 
+  /// <summary>
+  /// Class responsible for getting data from SQLite columns
+  /// </summary>
   TSQLiteField = class
   public
     Index: Integer;
@@ -335,7 +409,9 @@ type
     function Value: Variant;
     function ValueDef(const Def: Variant): Variant;
   end;
-
+  /// <summary>
+  /// Unidirectional SQLite table for fastest data access and very small memory footprint
+  /// </summary>
   TSQLiteUniTable = class
   private
     fColCount: cardinal;
@@ -366,6 +442,11 @@ type
     constructor Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
     destructor Destroy; override;
+    /// <summary>
+    /// Checks if fieldname exists
+    /// </summary>
+    /// <param name="AFieldName">name of the field</param>
+    /// <returns>if field exists, returns TSQLiteField instance, else returns nil</returns>
     function FindField(const AFieldName: string): TSQLiteField;
     function FieldAsInteger(I: cardinal): int64;
     function FieldAsBlob(I: cardinal): TMemoryStream;
@@ -507,6 +588,11 @@ begin
   Result := Sqlite3_LastInsertRowID(self.fDB);
 end;
 
+function TSQLiteDatabase.GetMemoryUsed: Int64;
+begin
+  Result := sqlite3_memory_used;
+end;
+
 function TSQLiteDatabase.GetPreparedStatement(const SQL: string;
   const Params: array of TVarRec): TSQLitePreparedStatement;
 begin
@@ -519,7 +605,7 @@ begin
 
 end;
 
-function TSQLiteDatabase.GetLastChangedRows: int64;
+function TSQLiteDatabase.GetLastChangedRows: Integer;
 begin
   Result := SQLite3_TotalChanges(self.fDB);
 end;
