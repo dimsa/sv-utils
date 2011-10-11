@@ -1,4 +1,18 @@
 #summary SQLite3 4 Delphi introduction.
+#labels Featured
 
-SQLite3 4 Delphi introduction here...
+=SQLite3 4 Delphi=
 
+===History===
+
+Based on [http://www.itwriting.com/blog/?page_id=659 Tim Anderson's] SQLite wrapper. 
+
+===Features===
+  * Support multiple platforms (currently supports Windows, Mac OSX, iOS)
+  * Full unicode support
+  * Takes advantage of the new Delphi language features (Generics, closures, etc.)
+  * Fast
+  * Simple to use
+  * Lightweight
+  * Supports adding [UserFuncs custom user functions]
+  * Can fetch data into your own data structure
