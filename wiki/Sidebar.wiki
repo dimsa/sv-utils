@@ -1,5 +1,5 @@
 #summary One-sentence summary of this page.
-
+#sidebar sidebar
 = Introduction =
 
 * [Articles HOWTO articles]
