@@ -1,0 +1,39 @@
+#summary Simple data loading using unidirectional table.
+#labels Featured,Phase-Implementation
+
+= Simple data loading using unidirectional table=
+
+{{{
+procedure TestTSQLiteDatabase.TestSimpleDataLoad;
+var
+  DB: TSQLiteDatabase;
+  stmt: TSQLitePreparedStatement;
+  dst: TSQLiteUniTable;
+  iVal: Integer;
+begin
+  DB := TSQLiteDatabase.Create('test.db');
+  try
+    //prepare statement with param value = 10
+    stmt := DB.GetPreparedStatement('select * from testtable where ID > ?', [10]);
+    try
+      //execute query and return the resultset
+      dst := stmt.ExecQuery;
+      try
+        while not dst.EOF do
+        begin
+          //get data from resultset
+          iVal := dst['ID'].AsInteger;
+
+          dst.Next;
+        end;
+      finally
+        dst.Free;
+      end;
+    finally
+      stmt.Free;
+    end;
+  finally
+    DB.Free;
+  end;
+end;
+}}}
