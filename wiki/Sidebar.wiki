@@ -1,7 +1,9 @@
 #summary Table of contents
+#labels Featured
 
   * [Utils Utilities]
     * [TPathBuilder TPathBuilder]
   * [SQLite3 SQLite3 4 Delphi] 
     * [Intro Introduction]
+    * [SimpleLoad Simple data loading]
     * [UserFunc User functions]
