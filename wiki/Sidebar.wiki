@@ -7,6 +7,8 @@
     * [ArticlesDom DOM manipulation]
     * [ArticlesStyle CSS and style]
     * [ArticlesTips Tips and tricks]
+  * [SQLite34Delphi SQLite 3 4 Delphi] 
+    * [Introduction Intro]
   * [DOMReference DOM reference]
   * [HTMLElements HTML reference]
   * [CSSReference CSS reference]
