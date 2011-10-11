@@ -1,6 +1,6 @@
 #summary Table of contents
 
-* [Utilities Utilities]
+  * [Utils Utilities]
     * [TPathBuilder TPathBuilder]
   * [SQLite3 SQLite3 4 Delphi] 
     * [Intro Introduction]
