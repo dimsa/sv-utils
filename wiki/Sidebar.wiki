@@ -2,12 +2,12 @@
 
 = Introduction =
 
-* [Articles HOWTO articles]
-    * [ArticlesXSS Web security]
+* [Utilities Utilities]
+    * [TPathBuilder TPathBuilder]
     * [ArticlesDom DOM manipulation]
     * [ArticlesStyle CSS and style]
     * [ArticlesTips Tips and tricks]
-  * [SQLite34Delphi SQLite 3 4 Delphi] 
+  * [SQLite34Delphi SQLite3 4 Delphi] 
     * [Introduction Intro]
   * [DOMReference DOM reference]
   * [HTMLElements HTML reference]
