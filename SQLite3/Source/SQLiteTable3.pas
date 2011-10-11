@@ -433,11 +433,12 @@ type
   /// Class responsible for getting data from SQLite columns
   /// </summary>
   TSQLiteField = class
+  private
+    Table: TSQLiteUniTable;
   public
     Index: Integer;
     Name: string;
     FieldType: Integer;
-    Table: TSQLiteUniTable;
 
     constructor Create(); virtual;
     destructor Destroy; override;
@@ -550,20 +551,6 @@ const
      dtDateTime, dtDate, dtBlob
     );
 
-{type
-  TSQLiteFuncType = (sftScalar, sftAggregate);
-
-  TSQLiteFuncs = record
-    Funcs: TSQLiteFunctions;
-    AFunc: TSQLiteUserFunc;
-    AStepFunc: TSQLiteUserFunc;
-    AFinalFunc: TSQLiteUserFuncFinal;
-    FuncType: TSQLiteFuncType;
-    FuncName: string;
-  end;
-
-  PSQLiteFuncs = ^TSQLiteFuncs; }
-
 procedure DisposePointer(ptr: pointer); cdecl;
 begin
   if assigned(ptr) then
@@ -622,28 +609,6 @@ begin
       end;
     end;
   end;
-
-//  MyProc := TProc(sqlite3_user_data(sqlite3_context));
-  //Assert(cArg = 1, 'Too many arguments');
-{  case sqlite3_value_type(ArgV) of
-    SQLITE_INTEGER:
-    begin
-      iVal := Abs(sqlite3_value_int64(ArgV^));
-
-      sqlite3_result_int64(sqlite3_context, iVal);
-    end;
-    SQLITE_NULL:
-    begin
-      sqlite3_result_null(sqlite3_context);
-    end;
-    else
-    begin
-      //sqlite3_value_text
-      iDoub := Abs(sqlite3_value_double(ArgV^));
-      sqlite3_result_double(sqlite3_context, iDoub);
-
-    end;
-  end; }
 end;
 
 {$IFDEF WIN32}
@@ -1937,7 +1902,9 @@ var
 begin
   Result := Unassigned;
   if EOF then
-    raise ESqliteException.Create('Table is at End of File');
+    raise ESqliteException.Create('Table is at End of File')
+  else if FieldIsNull(I) then
+    Exit;
   //integer types are not stored in the resultset
   //as strings, so they should be retrieved using the type-specific
   //methods

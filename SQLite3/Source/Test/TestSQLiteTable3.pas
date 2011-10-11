@@ -45,6 +45,7 @@ type
     procedure TestMemoryUsed;
     procedure TestFunctions;
     procedure TestFunctions2;
+    procedure TestSimpleDataLoad;
   end;
   // Test methods for class TSQLiteTable
 
@@ -161,9 +162,9 @@ var
 begin
   ColTypeName := 'BIT';  //uppercase
   ColType := dtInt;
-  // TODO: Setup method call parameters
+
   FSQLiteDatabase.AddNewSupportedColumnType(ColTypeName, ColType);
-  // TODO: Validate method results
+
   Check(TSQLiteDatabase.FColumnTypes.TryGetValue(ColTypeName, iRes));
 end;
 
@@ -173,24 +174,23 @@ var
   SQL: string;
 begin
   SQL := 'select * from testtable';
-  // TODO: Setup method call parameters
+
   ReturnValue := FSQLiteDatabase.GetTable(SQL);
   try
     Check((ReturnValue.ColCount > 0) and (ReturnValue.RowCount > 0));
   finally
     ReturnValue.Free;
   end;
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLiteDatabase.TestExecSQL;
 var
   SQL: string;
 begin
-  // TODO: Setup method call parameters
+
   SQL := 'update testtable set OtherId = 100 where ID = 10';
   FSQLiteDatabase.ExecSQL(SQL);
-  // TODO: Validate method results
+
   Check(FSQLiteDatabase.GetLastChangedRows = 1);
 end;
 
@@ -303,14 +303,13 @@ var
   ReturnValue: TSQLiteQuery;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   FSQLiteDatabase.ParamsClear;
   SQL := 'update testtable set OtherId = ? where ID = ?';
   ReturnValue := FSQLiteDatabase.PrepareSQL(SQL);
   FSQLiteDatabase.BindSQL(ReturnValue, 1, 101);
   FSQLiteDatabase.BindSQL(ReturnValue, 2, 10);
   FSQLiteDatabase.ExecSQL(ReturnValue);
-  // TODO: Validate method results
+
   Check(FSQLiteDatabase.GetLastChangedRows = 1);
 end;
 
@@ -319,12 +318,10 @@ var
   ReturnValue: Int64;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   SQL := 'select ID from testtable limit 1';
   ReturnValue := FSQLiteDatabase.GetTableValue(SQL);
 
   Check(ReturnValue = 1);
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLiteDatabase.TestMemoryUsed;
@@ -341,10 +338,9 @@ var
   ReturnValue: string;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   sql := 'select Name from testtable where ID = 2';
   ReturnValue := FSQLiteDatabase.GetTableString(SQL);
-  // TODO: Validate method results
+
   Check(ReturnValue = 'Some Name Русский 1');
 end;
 
@@ -353,7 +349,6 @@ var
   Value: TStrings;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   SQL := 'select name from testtable limit 1,10';
   Value := TStringList.Create;
   try
@@ -362,7 +357,6 @@ begin
   finally
     Value.Free;
   end;
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLiteDatabase.TestGetPreparedStatement;
@@ -370,10 +364,9 @@ var
   ReturnValue: TSQLitePreparedStatement;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   SQL := 'select * from testtable where ID > ? and Number > ?';
   ReturnValue := FSQLiteDatabase.GetPreparedStatement(SQL);
-  // TODO: Validate method results
+
   try
     Check(ReturnValue.Stmt <> nil);
   finally
@@ -386,10 +379,9 @@ var
   ReturnValue: TSQLitePreparedStatement;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   SQL := 'select * from testtable where ID > ? and Number > ?';
   ReturnValue := FSQLiteDatabase.GetPreparedStatement(SQL, [5, 1.1]);
-  // TODO: Validate method results
+
   try
     Check(ReturnValue.Stmt <> nil);
   finally
@@ -402,7 +394,6 @@ var
   BlobData: TFileStream;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   SQL := 'update testtable set picture = ? where ID = 5';
   BlobData := TFileStream.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'Sunset.jpg',
    fmOpenRead or fmShareDenyNone);
@@ -413,8 +404,6 @@ begin
   finally
     BlobData.Free;
   end;
-  // TODO: Validate method results
-
 end;
 
 procedure TestTSQLiteDatabase.TestCommit;
@@ -430,7 +419,7 @@ begin
   FSQLiteDatabase.Commit;
 
   iVal := FSQLiteDatabase.GetTableValue('select OtherID from testtable where ID = 10');
-  // TODO: Validate method results
+
   Check(iVal = iTest);
 end;
 
@@ -446,8 +435,41 @@ begin
 
   FSQLiteDatabase.Rollback;
   iVal := FSQLiteDatabase.GetTableValue('select OtherID from testtable where ID = 10');
-  // TODO: Validate method results
+
   Check(iVal <> iTest);
+end;
+
+procedure TestTSQLiteDatabase.TestSimpleDataLoad;
+var
+  DB: TSQLiteDatabase;
+  stmt: TSQLitePreparedStatement;
+  dst: TSQLiteUniTable;
+  iVal: Integer;
+begin
+  DB := TSQLiteDatabase.Create('test.db');
+  try
+    //prepare statement with param value = 10
+    stmt := DB.GetPreparedStatement('select * from testtable where ID > ?', [10]);
+    try
+      //execute query and return the resultset
+      dst := stmt.ExecQuery;
+      try
+        while not dst.EOF do
+        begin
+          //get data from resultset
+          iVal := dst['ID'].AsInteger;
+          Check(iVal > 10);
+          dst.Next;
+        end;
+      finally
+        dst.Free;
+      end;
+    finally
+      stmt.Free;
+    end;
+  finally
+    DB.Free;
+  end;
 end;
 
 procedure TestTSQLiteDatabase.TestTableExists;
@@ -456,9 +478,9 @@ var
   TableName: string;
 begin
   TableName := 'testtable';
-  // TODO: Setup method call parameters
+
   ReturnValue := FSQLiteDatabase.TableExists(TableName);
-  // TODO: Validate method results
+
   Check(ReturnValue);
   TableName := 'notexisting';
   ReturnValue := FSQLiteDatabase.TableExists(TableName);
@@ -472,7 +494,6 @@ var
 begin
   TargetDB := TSQLiteDatabase.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'backup.db');
   try
-  // TODO: Setup method call parameters
     ReturnValue := FSQLiteDatabase.Backup(TargetDB);
 
     Check(ReturnValue = SQLITE_DONE);
@@ -481,7 +502,6 @@ begin
   finally
     TargetDB.Free;
   end;
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLiteDatabase.TestAddCustomCollate;
@@ -529,7 +549,7 @@ end;
 procedure TestTSQLiteDatabase.TestParamsClear;
 begin
   FSQLiteDatabase.ParamsClear;
-  // TODO: Validate method results
+
   Check(True);
 end;
 
@@ -551,10 +571,9 @@ var
   ReturnValue: Int64;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   I := 0;
   ReturnValue := FSQLiteTable.FieldAsInteger(I);
-  // TODO: Validate method results
+
   Check(ReturnValue = 1);
 end;
 
@@ -563,11 +582,9 @@ var
   ReturnValue: TMemoryStream;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   I := 5;
 //  ReturnValue := TMemoryStream.Create;
   ReturnValue := FSQLiteTable.FieldAsBlob(I);
-  // TODO: Validate method results
   try
     Check(ReturnValue.Size > 0);
 
@@ -582,10 +599,9 @@ var
   ReturnValue: string;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   I := 4;
   ReturnValue := FSQLiteTable.FieldAsBlobText(I);
-  // TODO: Validate method results
+
   Check(ReturnValue <> '');
 end;
 
@@ -594,10 +610,9 @@ var
   ReturnValue: Boolean;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   I := 3;
   ReturnValue := FSQLiteTable.FieldIsNull(I);
-  // TODO: Validate method results
+
   Check(ReturnValue);
 end;
 
@@ -606,10 +621,9 @@ var
   ReturnValue: string;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   I := 2;
   ReturnValue := FSQLiteTable.FieldAsString(I);
-  // TODO: Validate method results
+
   Check(ReturnValue <> '');
 end;
 
@@ -618,10 +632,9 @@ var
   ReturnValue: Double;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   I := 1;
   ReturnValue := FSQLiteTable.FieldAsDouble(I);
-  // TODO: Validate method results
+
   Check(ReturnValue = 4);
 end;
 
@@ -630,7 +643,7 @@ var
   ReturnValue: Boolean;
 begin
   ReturnValue := FSQLiteTable.Next;
-  // TODO: Validate method results
+
   Check(FSQLiteTable.EOF);
 end;
 
@@ -639,7 +652,7 @@ var
   ReturnValue: Boolean;
 begin
   ReturnValue := FSQLiteTable.Previous;
-  // TODO: Validate method results
+
   Check(FSQLiteTable.BOF);
 end;
 
@@ -648,7 +661,7 @@ var
   ReturnValue: Boolean;
 begin
   ReturnValue := FSQLiteTable.MoveFirst;
-  // TODO: Validate method results
+
   Check(ReturnValue);
 end;
 
@@ -657,7 +670,7 @@ var
   ReturnValue: Boolean;
 begin
   ReturnValue := FSQLiteTable.MoveLast;
-  // TODO: Validate method results
+
   Check(ReturnValue);
 end;
 
@@ -666,10 +679,9 @@ var
   ReturnValue: Boolean;
   position: Cardinal;
 begin
-  // TODO: Setup method call parameters
   position := 2;
   ReturnValue := FSQLiteTable.MoveTo(position);
-  // TODO: Validate method results
+
   CheckFalse(ReturnValue);
   position := 0;
   ReturnValue := FSQLiteTable.MoveTo(position);
@@ -695,7 +707,7 @@ end;
 procedure TestTSQLitePreparedStatement.TestClearParams;
 begin
   FSQLitePreparedStatement.ClearParams;
-  // TODO: Validate method results
+
   CheckFalse(FSQLitePreparedStatement.ParamsBound);
 end;
 
@@ -705,7 +717,6 @@ var
   aname: string;
   numb: Double;
 begin
-  // TODO: Setup method call parameters
   value := 1;
   aname := 'Name 1';
   numb := 1;
@@ -715,7 +726,6 @@ begin
   FSQLitePreparedStatement.SetParamFloat(3, numb);
 
   Check(FSQLitePreparedStatement.ParamCount = 3);
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLitePreparedStatement.TestSetParamNull;
@@ -750,9 +760,11 @@ var
   ReturnValue: Boolean;
   DataList: TObjectList<TMyData>;
 begin
-  // TODO: Setup method call parameters
   DataList := TObjectList<TMyData>.Create;
+  FSQLitePreparedStatement.ClearParams;
+  FSQLitePreparedStatement.PrepareStatement('select * from testtable limit 10');
   try
+
     ReturnValue := FSQLitePreparedStatement.ExecSQLAndMapData<TMyData>(DataList);
 
     Check(ReturnValue);
@@ -760,7 +772,6 @@ begin
   finally
     DataList.Free;
   end;
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLitePreparedStatement.TestExecQuery;
@@ -769,7 +780,6 @@ var
 begin
   ReturnValue := FSQLitePreparedStatement.ExecQuery;
 
-  // TODO: Validate method results
   try
     CheckFalse(ReturnValue.EOF);
   finally
@@ -783,14 +793,13 @@ var
   SQL: string;
 begin
   SQL := 'select * from testtable';
-  // TODO: Setup method call parameters
+
   ReturnValue := FSQLitePreparedStatement.ExecQuery(SQL);
   try
     CheckFalse(ReturnValue.EOF);
   finally
     ReturnValue.Free;
   end;
-  // TODO: Validate method results
 end;
 
 procedure TestTSQLitePreparedStatement.TestExecQuery2;
@@ -798,12 +807,10 @@ var
   ReturnValue: TSQLiteUniTable;
   SQL: string;
 begin
-  // TODO: Setup method call parameters
   SQL := 'select * from testtable where ID = ?';
   FSQLitePreparedStatement.ClearParams;
   FSQLitePreparedStatement.PrepareStatement(SQL);
   ReturnValue := FSQLitePreparedStatement.ExecQuery(SQL, [10]);
-  // TODO: Validate method results
   try
     Check(ReturnValue.Fields[0].AsInteger = 10);
   finally
@@ -1043,10 +1050,8 @@ var
   ReturnValue: TSQLiteField;
   AFieldName: string;
 begin
-  // TODO: Setup method call parameters
   AFieldName := 'Number';
   ReturnValue := FSQLiteUniTable.FindField(AFieldName);
-  // TODO: Validate method results
   Check(ReturnValue <> nil);
 end;
 
@@ -1055,9 +1060,8 @@ var
   ReturnValue: Int64;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   ReturnValue := FSQLiteUniTable.FieldAsInteger(0);
-  // TODO: Validate method results
+
   Check(ReturnValue > 0);
 end;
 
@@ -1097,9 +1101,8 @@ var
   ReturnValue: Boolean;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
   ReturnValue := FSQLiteUniTable.FieldIsNull(3);
-  // TODO: Validate method results
+
   Check(ReturnValue);
 end;
 
@@ -1128,7 +1131,7 @@ var
   ReturnValue: Boolean;
 begin
   ReturnValue := FSQLiteUniTable.Next;
-  // TODO: Validate method results
+
   Check(ReturnValue);
 end;
 
