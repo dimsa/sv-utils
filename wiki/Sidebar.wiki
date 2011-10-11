@@ -1,22 +1,9 @@
 #summary One-sentence summary of this page.
 
-= Introduction =
+= Table of contents =
 
 * [Utilities Utilities]
     * [TPathBuilder TPathBuilder]
-    * [ArticlesDom DOM manipulation]
-    * [ArticlesStyle CSS and style]
-    * [ArticlesTips Tips and tricks]
   * [SQLite34Delphi SQLite3 4 Delphi] 
-    * [Introduction Intro]
-  * [DOMReference DOM reference]
-  * [HTMLElements HTML reference]
-  * [CSSReference CSS reference]
-
-
-= Details =
-
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+    * [Intro Introduction]
+    * [UserFunc User functions]
