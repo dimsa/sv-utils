@@ -1,9 +1,9 @@
-#summary One-sentence summary of this page.
-<wiki:toc max_depth="1" />
+#summary Table of contents
+
 = Table of contents =
 
 * [Utilities Utilities]
     * [TPathBuilder TPathBuilder]
-  * [SQLite34Delphi SQLite3 4 Delphi] 
-    * [Intro Introduction]
-    * [UserFunc User functions]
+  * [SQLite3 SQLite3 4 Delphi] 
+    * [SQLite3Intro Introduction]
+    * [SQLite3UserFunc User functions]
