@@ -1,5 +1,4 @@
 #summary Table of contents
-#labels Featured
 
   * [Utils Utilities]
     * [TPathBuilder TPathBuilder]
