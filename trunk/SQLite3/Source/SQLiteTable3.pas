@@ -371,9 +371,9 @@ type
     procedure SetParams(const Params: array of TVarRec);
     function FindParam(const I: Integer): TSQliteParam; overload;
     function FindParam(const name: string): TSQliteParam; overload;
-    function BindParameterCount: Integer;
     procedure SetSQL(const Value: string);
     function GetParamCount: Integer;
+    function GetParams(index: Integer): TSQliteParam;
   public
     constructor Create(DB: TSQLiteDatabase); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
@@ -394,6 +394,8 @@ type
     procedure SetParamDateTime(const name: string; const Value: TDateTime); overload;
     procedure SetParamDate(const I: Integer; const Value: TDate); overload;
     procedure SetParamDate(const name: string; const Value: TDate); overload;
+    procedure SetParamVariant(const I: Integer; const Value: Variant); overload;
+    procedure SetParamVariant(const name: string; const Value: Variant); overload;
 
     /// <summary>
     /// Executes previously set SQL statement and fetches results into given class type
@@ -425,6 +427,9 @@ type
     property DB: TSQLiteDatabase read FDB;
     property Stmt: TSQLiteStmt read FStmt;
     property SQL: string read FSQL write SetSQL;
+    property Params[index: Integer]: TSQliteParam read GetParams;
+    function BindParameterCount: Integer;
+    function BindParameterName(const i: Integer): string;
     property ParamCount: Integer read GetParamCount;
     property ParamsBound: Boolean read FParamsBound;
   end;
@@ -2170,6 +2175,66 @@ begin
   par.valuedata := utf8Encode(value);
 end;
 
+procedure TSQLitePreparedStatement.SetParamVariant(const I: Integer; const Value: Variant);
+var
+  vType: TVarType;
+begin
+  vType := VarType(Value);
+  case vType of
+    varInteger, varSmallint, varByte, varInt64, varUInt64, varWord, varLongWord, varShortInt,
+    varBoolean:
+    begin
+      SetParamInt(I, Value);
+    end;
+    varString, varUString, varOleStr:
+    begin
+      SetParamText(I, Value);
+    end;
+    varSingle, varDouble, varCurrency:
+    begin
+      SetParamFloat(I, Value);
+    end;
+    varDate:
+    begin
+      SetParamDateTime(I, Value);
+    end;
+    varNull, varEmpty:
+    begin
+      SetParamNull(I);
+    end;
+  end;
+end;
+
+procedure TSQLitePreparedStatement.SetParamVariant(const name: string; const Value: Variant);
+var
+  vType: TVarType;
+begin
+  vType := VarType(Value);
+  case vType of
+    varInteger, varSmallint, varByte, varInt64, varUInt64, varWord, varLongWord, varShortInt,
+    varBoolean:
+    begin
+      SetParamInt(name, Value);
+    end;
+    varString, varUString, varOleStr:
+    begin
+      SetParamText(name, Value);
+    end;
+    varSingle, varDouble, varCurrency:
+    begin
+      SetParamFloat(name, Value);
+    end;
+    varDate:
+    begin
+      SetParamDateTime(name, Value);
+    end;
+    varNull, varEmpty:
+    begin
+      SetParamNull(name);
+    end;
+  end;
+end;
+
 procedure TSQLitePreparedStatement.SetSQL(const Value: string);
 begin
   if Value <> FSQL then
@@ -2416,6 +2481,11 @@ begin
   Result := fParams.Count;
 end;
 
+function TSQLitePreparedStatement.GetParams(index: Integer): TSQliteParam;
+begin
+  Result := fParams[index];
+end;
+
 procedure TSQLitePreparedStatement.PrepareStatement(const SQL: string; const Params: array of TVarRec);
 begin
   PrepareStatement(SQL);
@@ -2456,6 +2526,15 @@ begin
     Result := sqlite3_bind_parameter_count(FStmt)
   else
     Result := 0;
+end;
+
+function TSQLitePreparedStatement.BindParameterName(const i: Integer): string;
+begin
+  Result := '';
+  if FStmt <> nil then
+  begin
+    Result := sqlite3_bind_parameter_name(FStmt, i);
+  end;
 end;
 
 procedure TSQLitePreparedStatement.BindParams;
