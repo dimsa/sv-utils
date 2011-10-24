@@ -71,12 +71,12 @@ uses
   {$IFDEF WIN32}
   Winapi.Windows,
   {$ENDIF}
-  System.Classes, System.SysUtils, System.Generics.Collections;
+  System.Classes, System.SysUtils, System.Generics.Collections, System.DB;
   {$ELSE}
   {$IFDEF WIN32}
   Windows,
   {$ENDIF}
-  Classes, SysUtils, Generics.Collections;
+  Classes, SysUtils, Generics.Collections, DB;
   {$ENDIF}
 
 const
@@ -534,6 +534,7 @@ procedure DisposePointer(ptr: pointer); cdecl;
 function SystemCollate(Userdta: pointer; Buf1Len: integer; Buf1: pointer;
     Buf2Len: integer; Buf2: pointer): integer; cdecl;
 {$ENDIF}
+function SQLiteDataTypeToDelphiFieldType(SQLiteDataType: Integer): TFieldType;
 
 implementation
 
@@ -624,6 +625,19 @@ begin
     PWideChar(Buf2), Buf2Len) - 2;
 end;
 {$ENDIF}
+
+function SQLiteDataTypeToDelphiFieldType(SQLiteDataType: Integer): TFieldType;
+begin
+  Result := ftString;
+  case SQLiteDataType of
+    dtInt: Result := ftInteger;
+    dtNumeric: Result := ftFloat;
+    dtStr: Result := ftWideString;
+    dtBlob : Result := ftBlob;
+    dtDate : Result := ftDate;
+    dtDateTime: Result := ftDateTime;
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // TSQLiteDatabase

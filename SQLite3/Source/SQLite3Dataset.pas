@@ -1,9 +1,36 @@
+(*
+* Copyright (c) 2011, Linas Naginionis
+* Contacts: lnaginionis@gmail.com or support@soundvibe.net
+* All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*     * Redistributions of source code must retain the above copyright
+*       notice, this list of conditions and the following disclaimer.
+*     * Redistributions in binary form must reproduce the above copyright
+*       notice, this list of conditions and the following disclaimer in the
+*       documentation and/or other materials provided with the distribution.
+*     * Neither the name of the <organization> nor the
+*       names of its contributors may be used to endorse or promote products
+*       derived from this software without specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY THE AUTHOR ''AS IS'' AND ANY
+* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+* DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+* DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*)
 unit SQLite3Dataset;
 
 interface
 
 uses
-  DBClient, Classes, SQLiteTable3, DB, SysUtils;
+  SQLiteTable3, DBClient, Classes, DB, SysUtils, MidasLib, Generics.Collections;
 
 type
    /// <summary>
@@ -26,6 +53,16 @@ type
     property RefreshSQL: TStrings read FRefreshSQL write FRefreshSQL;
   end;
 
+  T3<TKey, T, TValue> = record
+    Key: TKey;
+    Second: T;
+    Value: TValue;
+    constructor Create(const AKey: TKey; const ASecond: T; const AValue: TValue);
+  end;
+
+  /// <summary>
+  /// Dataset based on TClientDataset for using SQLite with visual controls
+  /// </summary>
   TSQLiteDataset = class(TClientDataset)
   private
     FUpdateSQL: TSQLiteUpdateSQL;
@@ -35,38 +72,94 @@ type
     FStmtDel: TSQLitePreparedStatement;
     FAutoIncField: TField;
     FAutoIncFieldName: string;
+    FIniting: Boolean;
   protected
-
+    function DoInitFields(AStmt: TSQLitePreparedStatement): TSQLiteUniTable;
+    procedure DoInternalOpen(tbl: TSQLiteUniTable);
+    procedure DoInternalRefreshRecord(); virtual;
+    procedure SetActive(Value: Boolean); override;
+    procedure GetPair(Astmt: TSQLitePreparedStatement; AList: TList<T3<string, Boolean, TField>>);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     function ApplyUpdates(MaxErrors: Integer; UseTrans: Boolean = True): Integer; reintroduce; overload;
+    /// <summary>
+    /// Commit changes to the database
+    /// </summary>
+    /// <returns></returns>
     function ApplyUpdates(): Integer; reintroduce; overload;
-
     property AutoIncField: TField read FAutoIncField;
+    procedure RefreshRecord(); reintroduce;
   published
+    /// <summary>
+    /// Auto increment primary key fieldname value. Needed to get inserted new row's primary key value
+    /// </summary>
     property AutoIncFieldName: string read FAutoIncFieldName write FAutoIncFieldName;
     property Database: TSQLiteDatabase read FDB write FDB;
+    /// <summary>
+    /// UpdateSQl component where update statements are defined
+    /// </summary>
     property UpdateSQL: TSQLiteUpdateSQL read FUpdateSQL write FUpdateSQL;
-
   end;
 
 
 implementation
 
 uses
-  Generics.Collections,
   StrUtils;
 
-type
-  T3<TKey, T, TValue> = record
-    Key: TKey;
-    Second: T;
-    Value: TValue;
-    constructor Create(const AKey: TKey; const ASecond: T; const AValue: TValue);
-  end;
-
 { TSQLiteDataset }
+
+procedure TSQLiteDataset.GetPair(Astmt: TSQLitePreparedStatement; AList: TList<T3<string, Boolean, TField>>);
+var
+  i, iPos: Integer;
+  fld: TField;
+  sField: string;
+  A3: T3<string, Boolean, TField>;
+begin
+  for i := 1 to Astmt.BindParameterCount do
+  begin
+    A3.Key := Astmt.BindParameterName(i);
+    A3.Second := False;
+   // sField := A3.Key;
+
+    if Length(A3.Key) > 0 then
+    begin
+      //trim first param letter
+      sField := Copy(A3.Key, 2, Length(A3.Key)-1);
+    end
+    else
+    begin
+      raise ESQLiteException.Create('Incorrect parameter name: ' + A3.Key);
+    end;
+
+    fld := FindField(sField);
+    if not Assigned(fld) then
+    begin
+      //parse param name
+      iPos := PosEx('_', sField);
+      if (iPos = 4) then   //correct format - OLD_ID
+      begin
+        A3.Second := SameText(Copy(sField, 1, 3), 'OLD');
+
+        if A3.Second then
+        begin
+          fld := FieldByName('OLD_' + Copy(sField, 5, Length(sField)-4));
+        end;
+      end;
+    end;
+
+    if Assigned(fld) then
+    begin
+      A3.Value := fld;
+      AList.Add(A3);
+    end
+    else
+    begin
+      raise ESQLiteException.Create(Format('Fieldname %S does not exist', []));
+    end;
+  end;
+end;
 
 function TSQLiteDataset.ApplyUpdates(MaxErrors: Integer; UseTrans: Boolean): Integer;
 var
@@ -76,7 +169,6 @@ var
   dicUpd, dicIns, dicDel: TList<T3<string, Boolean, TField>>;
   uStatus: TUpdateStatus;
   oldRecNo: Integer;
-  iKey: Int64;
   {$REGION 'Doc'}
   /// <summary>
   /// Applies updates to Sqlite
@@ -90,9 +182,10 @@ var
     i: Integer;
     dic: TList<T3<string, Boolean, TField>>;
     stmt: TSQLitePreparedStatement;
+    iKey: Int64;
   begin
     Result := False;
-    
+
     //prepare values
     case AUpdateStatus of
       usModified:
@@ -104,8 +197,6 @@ var
       begin
         dic := dicIns;
         stmt := FStmtIns;
-        {TODO -oLinas -cGeneral : resync autoincrement primary key}
-        //FDB.GetLastInsertRowID
       end;
       usDeleted:
       begin
@@ -123,9 +214,9 @@ var
       A3 := dic[i-1];
 
       if A3.Second then
-        stmt.SetParamVariant(i, dic[i-1].Value.OldValue)
+        stmt.SetParamVariant(i, A3.Value.OldValue)
       else
-        stmt.SetParamVariant(i, dic[i-1].Value.Value);
+        stmt.SetParamVariant(i, A3.Value.Value);
     end;
 
     try
@@ -135,11 +226,17 @@ var
         if Assigned(FAutoIncField) then
         begin
           iKey := FDB.GetLastInsertRowID;
-          Edit;
 
-          FAutoIncField.SetData(@iKey);
-          {TODO -oLinas -cGeneral : exception: index is read only. dont know why...}
-          Post;
+          if iKey <> 0 then
+          begin
+            Edit;
+
+            FAutoIncField.Value := iKey;
+
+            Post;
+          end;
+
+
         end;
 
 
@@ -151,59 +248,7 @@ var
   end;
 
   procedure FillParams();
-
-    procedure GetPair(Astmt: TSQLitePreparedStatement; AList: TList<T3<string, Boolean, TField>>);
-    var
-      i, iPos: Integer;
-      fld: TField;
-      sField: string;
-      A3: T3<string, Boolean, TField>;
-    begin 
-      for i := 1 to Astmt.BindParameterCount do
-      begin
-        A3.Key := Astmt.BindParameterName(i);
-        A3.Second := False;
-       // sField := A3.Key;
-
-        if Length(A3.Key) > 0 then
-        begin
-          //trim first param letter
-          sField := Copy(A3.Key, 2, Length(A3.Key)-1);
-        end
-        else
-        begin
-          raise ESQLiteException.Create('Incorrect parameter name: ' + A3.Key);
-        end;
-
-        fld := FindField(sField);
-        if not Assigned(fld) then
-        begin
-          //parse param name
-          iPos := PosEx('_', sField);
-          if (iPos = 4) then   //correct format - OLD_ID
-          begin
-            A3.Second := SameText(Copy(sField, 1, 3), 'OLD');
-
-            if A3.Second then
-            begin
-              fld := FieldByName('OLD_' + Copy(sField, 5, Length(sField)-4));
-            end;
-          end;
-        end;
-
-        if Assigned(fld) then
-        begin
-          A3.Value := fld;
-          AList.Add(A3);
-        end
-        else
-        begin
-          raise ESQLiteException.Create(Format('Fieldname %S does not exist', []));
-        end;
-      end;
-    end;
-
-  begin   
+  begin
     GetPair(FStmtUpd, dicUpd);
     GetPair(FStmtIns, dicIns);
     GetPair(FStmtDel, dicDel);  
@@ -230,21 +275,21 @@ begin
   FStmtUpd := TSQLitePreparedStatement.Create(FDB, UpdateSQL.FModifySQL.Text);
   FStmtIns := TSQLitePreparedStatement.Create(FDB, UpdateSQL.FInsertSQL.Text);
   FStmtDel := TSQLitePreparedStatement.Create(FDB, UpdateSQL.FDeleteSQL.Text);
-  //dictionaries for storing prepared fields
-  //key = (pair left = ParamName, pair right = Fieldname in the dataset)
+  //lists for storing prepared fields
+  //key = (pair left = ParamName, pair second = isOldValue)
   //value = TField in the dataset
   dicUpd := TList<T3<string, Boolean, TField>>.Create();
   dicIns := TList<T3<string, Boolean, TField>>.Create();
   dicDel := TList<T3<string, Boolean, TField>>.Create();
-
-  //fill dictionaries
 
   if UseTrans then
     FDB.BeginTransaction;
   try
     FillParams;
 
-    StatusFilter := [usInserted, usDeleted, usModified];
+    //StatusFilter := [usInserted, usDeleted, usModified];
+    //logically should be  [usInserted, usDeleted, usModified] but then bug appears when trying to edit first column value
+    StatusFilter := [];
 
     First;
 
@@ -256,7 +301,28 @@ begin
         Next;
         Continue;
       end;
-    
+
+      if not DoApplyUpdate(uStatus) then
+        Inc(errCount)
+      else
+        Inc(Result);
+
+      Next;
+    end;
+    //check for deletions
+    StatusFilter := [usDeleted];
+
+    First;
+
+    while not Eof do
+    begin
+      uStatus := UpdateStatus;
+      if uStatus = usUnmodified then
+      begin
+        Next;
+        Continue;
+      end;
+
       if not DoApplyUpdate(uStatus) then
         Inc(errCount)
       else
@@ -314,6 +380,7 @@ begin
   FStmtDel := nil;
   FAutoIncField := nil;
   FAutoIncFieldName := '';
+  FIniting := False;
 end;
 
 destructor TSQLiteDataset.Destroy;
@@ -323,6 +390,169 @@ begin
   FAutoIncField := nil;
   FAutoIncFieldName := '';
   inherited;
+end;
+
+function TSQLiteDataset.DoInitFields(AStmt: TSQLitePreparedStatement): TSQLiteUniTable;
+var
+  i: Integer;
+  fType: TFieldType;
+begin
+  Result := nil;
+  DisableControls;
+  FIniting := True;
+  try
+    for i := 1 to ParamCount do
+    begin
+      AStmt.SetParamVariant(i, Params[i-1].Value);
+    end;
+
+    Result := AStmt.ExecQuery;
+    //define DS
+    FieldDefs.Clear;
+    for i := 0 to Result.FieldCount - 1 do
+    begin
+      fType := SQLiteDataTypeToDelphiFieldType(Result.Fields[i].FieldType);
+      case fType of
+        ftString, ftWideString:
+        begin
+          {TODO -oLinas -cGeneral : make property to choose default string field size}
+          FieldDefs.Add(Result.Fields[i].Name, fType, 50);
+        end
+        else
+        begin
+          FieldDefs.Add(Result.Fields[i].Name, fType);
+        end;
+      end;
+
+    end;
+
+    CreateDataSet;
+
+  finally
+    EnableControls;
+    FIniting := False;
+  end;
+end;
+
+procedure TSQLiteDataset.DoInternalOpen(tbl: TSQLiteUniTable);
+var
+  i: Integer;
+begin
+  if not Assigned(tbl) and (FIniting) then
+    Exit;
+
+  DisableControls;
+  try
+    while not tbl.EOF do
+    begin
+      Append;
+
+      for i := 0 to tbl.FieldCount - 1 do
+      begin
+        Fields[i].Value := tbl.Fields[i].Value;
+      end;
+
+      Post;
+
+      tbl.Next;
+    end;
+
+    First;
+
+  finally
+    EnableControls;
+  end;
+end;
+
+procedure TSQLiteDataset.DoInternalRefreshRecord;
+var
+  stmt: TSQLitePreparedStatement;
+  tbl: TSQLiteUniTable;
+  i: Integer;
+  AList: TList<T3<string, Boolean, TField>>;
+  A3: T3<string, Boolean, TField>;
+begin
+  stmt := TSQLitePreparedStatement.Create(FDB, FUpdateSQL.RefreshSQL.Text);
+  AList := TList<T3<string, Boolean, TField>>.Create;
+  try
+    GetPair(stmt, AList);
+
+    for i := 1 to AList.Count do
+    begin
+      A3 := AList[i-1];
+
+      if A3.Second then
+        stmt.SetParamVariant(i, A3.Value.OldValue)
+      else
+        stmt.SetParamVariant(i, A3.Value.Value);
+    end;
+
+    tbl := stmt.ExecQuery;
+    try
+      if not tbl.EOF then
+      begin
+        Edit;
+        for i := 0 to tbl.FieldCount - 1 do
+        begin
+          FieldByName(tbl.Fields[i].Name).Value := tbl.Fields[i].Value;
+        end;
+
+        Post;
+      end;
+    finally
+      tbl.Free;
+    end;
+
+  finally
+    stmt.Free;
+    AList.Free;
+  end;
+end;
+
+procedure TSQLiteDataset.RefreshRecord;
+begin
+  CheckActive;
+
+  if State in [dsInsert] then
+    Exit;
+
+  if State in [dsEdit] then
+    Post;
+
+  UpdateCursorPos;
+
+  DoInternalRefreshRecord;
+end;
+
+procedure TSQLiteDataset.SetActive(Value: Boolean);
+var
+  tbl: TSQLiteUniTable;
+  stmt : TSQLitePreparedStatement;
+begin
+  if (Active <> Value) and not (csReading in ComponentState) and not (FIniting) then
+  begin
+    tbl := nil;
+    stmt := nil;
+    if Value then
+    begin
+      stmt := TSQLitePreparedStatement.Create(FDB, CommandText);
+      tbl := DoInitFields(stmt);
+    end;
+
+    inherited;
+
+    if Value then
+    begin
+      DoInternalOpen(tbl);
+      MergeChangeLog;
+    end;
+
+    if Assigned(tbl) then
+      tbl.Free;
+
+    if Assigned(stmt) then
+      stmt.Free;
+  end;
 end;
 
 { TSQLiteUpdateSQL }
