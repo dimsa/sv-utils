@@ -498,6 +498,11 @@ begin
         end;
 
         Post;
+      end
+      else
+      begin
+        //record deleted
+        Delete;
       end;
     finally
       tbl.Free;
@@ -528,6 +533,7 @@ procedure TSQLiteDataset.SetActive(Value: Boolean);
 var
   tbl: TSQLiteUniTable;
   stmt : TSQLitePreparedStatement;
+  oldLogChanges: Boolean;
 begin
   if (Active <> Value) and not (csReading in ComponentState) and not (FIniting) then
   begin
@@ -543,8 +549,15 @@ begin
 
     if Value then
     begin
-      DoInternalOpen(tbl);
-      MergeChangeLog;
+      oldLogChanges := LogChanges;
+      LogChanges := False;
+      try
+        DoInternalOpen(tbl);
+      finally
+        LogChanges := oldLogChanges;
+      end;
+
+     // MergeChangeLog;  //slows down drastically!
     end;
 
     if Assigned(tbl) then
