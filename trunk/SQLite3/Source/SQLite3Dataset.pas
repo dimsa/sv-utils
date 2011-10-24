@@ -33,6 +33,8 @@ type
     FStmtUpd: TSQLitePreparedStatement;
     FStmtIns: TSQLitePreparedStatement;
     FStmtDel: TSQLitePreparedStatement;
+    FAutoIncField: TField;
+    FAutoIncFieldName: string;
   protected
 
   public
@@ -40,7 +42,10 @@ type
     destructor Destroy; override;
     function ApplyUpdates(MaxErrors: Integer; UseTrans: Boolean = True): Integer; reintroduce; overload;
     function ApplyUpdates(): Integer; reintroduce; overload;
+
+    property AutoIncField: TField read FAutoIncField;
   published
+    property AutoIncFieldName: string read FAutoIncFieldName write FAutoIncFieldName;
     property Database: TSQLiteDatabase read FDB write FDB;
     property UpdateSQL: TSQLiteUpdateSQL read FUpdateSQL write FUpdateSQL;
 
@@ -71,6 +76,7 @@ var
   dicUpd, dicIns, dicDel: TList<T3<string, Boolean, TField>>;
   uStatus: TUpdateStatus;
   oldRecNo: Integer;
+  iKey: Int64;
   {$REGION 'Doc'}
   /// <summary>
   /// Applies updates to Sqlite
@@ -98,6 +104,8 @@ var
       begin
         dic := dicIns;
         stmt := FStmtIns;
+        {TODO -oLinas -cGeneral : resync autoincrement primary key}
+        //FDB.GetLastInsertRowID
       end;
       usDeleted:
       begin
@@ -122,6 +130,20 @@ var
 
     try
       Result := stmt.ExecSQL;
+      if AUpdateStatus = usInserted then
+      begin
+        if Assigned(FAutoIncField) then
+        begin
+          iKey := FDB.GetLastInsertRowID;
+          Edit;
+
+          FAutoIncField.SetData(@iKey);
+          {TODO -oLinas -cGeneral : exception: index is read only. dont know why...}
+          Post;
+        end;
+
+
+      end;
     except
       Result := False;
     end;
@@ -197,6 +219,8 @@ begin
   if (ChangeCount < 1) and not (Assigned(FUpdateSQL)) and not (Assigned(FDB)) then
     Exit;
 
+  FAutoIncField := FindField(FAutoIncFieldName);
+
   bkm := Bookmark;
 
   OrigFilter := StatusFilter;
@@ -271,7 +295,6 @@ begin
     except
       //spawn
     end;
-    
     EnableControls;
   end;
 end;
@@ -289,12 +312,16 @@ begin
   FStmtUpd := nil;
   FStmtIns := nil;
   FStmtDel := nil;
+  FAutoIncField := nil;
+  FAutoIncFieldName := '';
 end;
 
 destructor TSQLiteDataset.Destroy;
 begin
   FUpdateSQL := nil;
   FDB := nil;
+  FAutoIncField := nil;
+  FAutoIncFieldName := '';
   inherited;
 end;
 
