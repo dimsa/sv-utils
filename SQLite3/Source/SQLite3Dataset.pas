@@ -30,7 +30,7 @@ unit SQLite3Dataset;
 interface
 
 uses
-  SQLiteTable3, DBClient, Classes, DB, SysUtils, MidasLib, Generics.Collections;
+  SQLiteTable3, DBClient, Classes, DB, SysUtils, Generics.Collections;
 
 type
    /// <summary>
@@ -543,7 +543,13 @@ begin
     begin
       stmt := TSQLitePreparedStatement.Create(FDB, CommandText);
       tbl := DoInitFields(stmt);
+    end
+    else
+    begin
+      Self.CancelUpdates;
     end;
+
+
 
     inherited;
 
@@ -556,7 +562,6 @@ begin
       finally
         LogChanges := oldLogChanges;
       end;
-
      // MergeChangeLog;  //slows down drastically!
     end;
 
