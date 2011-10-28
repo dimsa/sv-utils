@@ -105,7 +105,8 @@ type
     valueinteger: int64;
     valuefloat: double;
     valuedata: RawByteString;
-
+    valueptr: Pointer;
+    blobsize: Int64;
     constructor Create(); virtual;
   end;
 
@@ -396,6 +397,8 @@ type
     procedure SetParamDate(const name: string; const Value: TDate); overload;
     procedure SetParamVariant(const I: Integer; const Value: Variant); overload;
     procedure SetParamVariant(const name: string; const Value: Variant); overload;
+    procedure SetParamBlob(const I: Integer; const Value: TStream); overload;
+    procedure SetParamBlob(const name: string; const Value: TStream); overload;
 
     /// <summary>
     /// Executes previously set SQL statement and fetches results into given class type
@@ -559,8 +562,8 @@ const
 
 procedure DisposePointer(ptr: pointer); cdecl;
 begin
-  if assigned(ptr) then
-    freemem(ptr);
+  if Assigned(ptr) then
+    FreeMem(ptr);
 end;
 
 
@@ -2005,8 +2008,9 @@ end;
 constructor TSQliteParam.Create;
 begin
   inherited Create;
-
+  valueptr := nil;
   index := -1;
+  blobsize := 0;
 end;
 
 
@@ -2021,6 +2025,53 @@ end;
 procedure TSQLitePreparedStatement.SetParamDate(const I: Integer; const Value: TDate);
 begin
   SetParamText(I, DateToStr(Value, FDB.FFormatSett));
+end;
+
+procedure TSQLitePreparedStatement.SetParamBlob(const I: Integer; const Value: TStream);
+var
+  par: TSQliteParam;
+begin
+  par := TSQliteParam.Create;
+  par.index := I;
+  par.valuetype := SQLITE_BLOB;
+  par.blobsize := Value.Size;
+  if par.blobsize > 0 then
+  begin
+    GetMem(par.valueptr, par.blobsize);
+    if (par.valueptr = nil) then
+      raise ESqliteException.CreateFmt('Error getting memory to set blob as param',
+        ['', 'Error']);
+
+    Value.Position := 0;
+    Value.Read(par.valueptr^, par.blobsize);
+  end;
+
+  fParams.Add(par);
+
+  //par.valueptr := value;
+end;
+
+procedure TSQLitePreparedStatement.SetParamBlob(const name: string; const Value: TStream);
+var
+  par: TSQliteParam;
+begin
+  par := TSQliteParam.Create;
+  par.name := name;
+  par.valuetype := SQLITE_BLOB;
+  par.blobsize := Value.Size;
+  if par.blobsize > 0 then
+  begin
+    GetMem(par.valueptr, par.blobsize);
+    if (par.valueptr = nil) then
+      raise ESqliteException.CreateFmt('Error getting memory to set blob as param',
+        ['', 'Error']);
+
+    Value.Position := 0;
+    Value.Read(par.valueptr^, par.blobsize);
+  end;
+  fParams.Add(par);
+
+// par.valueptr := value;
 end;
 
 procedure TSQLitePreparedStatement.SetParamDate(const name: string; const Value: TDate);
@@ -2139,6 +2190,17 @@ begin
       vtBoolean:
       begin
         SetParamInt(i+1, Integer(Params[i].VBoolean));
+      end;
+      vtObject:
+      begin
+        if (Params[i].VObject is TStream) then
+        begin
+          SetParamBlob(i+1, TStream(Params[i].VObject));
+        end
+        else
+        begin
+          raise ESQLiteException.Create('Unsupported param object type');
+        end;
       end;
       vtPointer:
       begin
@@ -2554,7 +2616,7 @@ end;
 procedure TSQLitePreparedStatement.BindParams;
 var
   n: integer;
-  i: integer;
+  i, iBindResult: integer;
   par: TSQliteParam;
 begin
   if (BindParameterCount = fParams.Count) and not (FParamsBound) and (FStmt <> nil) then
@@ -2589,7 +2651,12 @@ begin
            // sqlite3_bind_text16(fStmt, i, PChar(par.valuedata),
            //   -1, SQLITE_TRANSIENT);
           end;
-
+          SQLITE_BLOB:
+          begin
+            iBindResult := SQLite3_Bind_Blob(FStmt, i, par.valueptr, par.blobsize, @DisposePointer);
+            if iBindResult <> SQLITE_OK then
+                FDB.RaiseError('Error binding blob to database. Param index: ' + IntToStr(i), '');
+          end;
           SQLITE_NULL:
             sqlite3_bind_null(fStmt, i);
         end;

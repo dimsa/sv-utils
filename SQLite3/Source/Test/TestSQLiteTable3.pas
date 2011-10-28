@@ -91,6 +91,8 @@ type
     procedure TestExecSQL2;
     procedure TestExecSQL3;
     procedure TestExecSQL4;
+    procedure TestPreparedBlobs;
+    procedure TestPreparedBlobs2;
     procedure TestPrepareStatement;
     procedure TestPrepareStatement1;
   end;
@@ -865,6 +867,56 @@ begin
   // TODO: Setup method call parameters
  // ReturnValue := FSQLitePreparedStatement.ExecSQL(SQL, []);
   // TODO: Validate method results
+end;
+
+procedure TestTSQLitePreparedStatement.TestPreparedBlobs;
+var
+  ReturnValue: Boolean;
+  SQL: string;
+  ss: TStringStream;
+  img: TFileStream;
+begin
+  SQL := 'insert into testtable (notes, picture) values (?,?)';
+  FSQLitePreparedStatement.ClearParams;
+
+  ss := TStringStream.Create('Testing strings');
+  img := TFileStream.Create('Sunset.jpg', fmOpenRead or fmShareDenyNone);
+
+  FSQLitePreparedStatement.PrepareStatement(SQL, [ss, img]);
+  ReturnValue := FSQLitePreparedStatement.ExecSQL(SQL);
+  try
+    Check(ReturnValue = true);
+    Check(FSQLiteDatabase.GetLastChangedRows = 1);
+  finally
+    ss.Free;
+    img.Free;
+  end;
+end;
+
+procedure TestTSQLitePreparedStatement.TestPreparedBlobs2;
+var
+  ReturnValue: Boolean;
+  SQL: string;
+  ss: TStringStream;
+  img: TFileStream;
+begin
+  SQL := 'insert into testtable (notes, picture) values (?,?)';
+  FSQLitePreparedStatement.ClearParams;
+
+  ss := TStringStream.Create('Testing strings');
+  img := TFileStream.Create('Sunset.jpg', fmOpenRead or fmShareDenyNone);
+
+  FSQLitePreparedStatement.PrepareStatement(SQL);
+  FSQLitePreparedStatement.SetParamBlob(1, ss);
+  FSQLitePreparedStatement.SetParamBlob(2, img);
+  ReturnValue := FSQLitePreparedStatement.ExecSQL(SQL);
+  try
+    Check(ReturnValue = true);
+    Check(FSQLiteDatabase.GetLastChangedRows = 1);
+  finally
+    ss.Free;
+    img.Free;
+  end;
 end;
 
 procedure TestTSQLitePreparedStatement.TestPrepareStatement;
