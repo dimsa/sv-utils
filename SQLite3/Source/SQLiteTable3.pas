@@ -2147,6 +2147,7 @@ var
   i: Integer;
   ext: Extended;
   d: Double;
+  v: Variant;
 begin
   for i := Low(Params) to High(Params) do
   begin
@@ -2202,6 +2203,11 @@ begin
           raise ESQLiteException.Create('Unsupported param object type');
         end;
       end;
+      vtVariant:
+      begin
+        v := Params[i].VVariant^;
+        SetParamVariant(i+1, v);
+      end;
       vtPointer:
       begin
         if Params[i].VPointer = nil then
@@ -2254,6 +2260,9 @@ end;
 procedure TSQLitePreparedStatement.SetParamVariant(const I: Integer; const Value: Variant);
 var
   vType: TVarType;
+  bStream: TMemoryStream;
+  ptr: Pointer;
+  iDim: Integer;
 begin
   vType := VarType(Value);
   case vType of
@@ -2277,6 +2286,24 @@ begin
     varNull, varEmpty:
     begin
       SetParamNull(I);
+    end
+    else
+    begin
+      if VarIsArray(Value) then
+      begin
+        //blob type
+        bStream := TMemoryStream.Create();
+        iDim := VarArrayDimCount(Value);
+        ptr := VarArrayLock(Value);
+        try
+          bStream.WriteBuffer(ptr^, VarArrayHighBound(Value, iDim));
+
+          SetParamBlob(I, bStream);
+        finally
+          VarArrayUnlock(Value);
+          bStream.Free;
+        end;
+      end;
     end;
   end;
 end;
@@ -2284,6 +2311,9 @@ end;
 procedure TSQLitePreparedStatement.SetParamVariant(const name: string; const Value: Variant);
 var
   vType: TVarType;
+  bStream: TMemoryStream;
+  ptr: Pointer;
+  iDim: Integer;
 begin
   vType := VarType(Value);
   case vType of
@@ -2307,6 +2337,24 @@ begin
     varNull, varEmpty:
     begin
       SetParamNull(name);
+    end
+    else
+    begin
+      if VarIsArray(Value) then
+      begin
+        //blob type
+        bStream := TMemoryStream.Create();
+        iDim := VarArrayDimCount(Value);
+        ptr := VarArrayLock(Value);
+        try
+          bStream.WriteBuffer(ptr^, VarArrayHighBound(Value, iDim));
+
+          SetParamBlob(name, bStream);
+        finally
+          VarArrayUnlock(Value);
+          bStream.Free;
+        end;
+      end;
     end;
   end;
 end;
