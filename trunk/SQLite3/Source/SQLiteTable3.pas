@@ -197,7 +197,10 @@ type
     /// </summary>
     /// <param name="AFileName">filename of sqlite database</param>
     /// <param name="DefaultEncoding">encoding to use when creating new database</param>
-    constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8);
+    /// <param name="Password">Password to encrypt database. Notes: default sqlite.dll does not support database encryption.
+    /// To encrypt your database you must use http://system.data.sqlite.org/index.html/doc/trunk/www/index.wiki or
+    /// http://sourceforge.net/projects/wxcode/files/Components/wxSQLite3/ library file (rename it to sqlite3.dll) </param>
+    constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8; const Password: AnsiString = '');
     destructor Destroy; override;
      /// <summary>
      /// Adds new supported column type
@@ -272,6 +275,12 @@ type
     /// </summary>
     /// <returns>Memory used in bytes</returns>
     function GetMemoryUsed: Int64;
+    /// <summary>
+    /// Change password for encrypted database
+    /// </summary>
+    /// <param name="NewPassword">New password: Ansistring</param>
+    procedure ChangePassword(const NewPassword: AnsiString);
+
     procedure SetTimeout(Value: integer);
     function Backup(TargetDB: TSQLiteDatabase): integer; Overload;
     function Backup(TargetDB: TSQLiteDatabase; const targetName: String; const sourceName: String): integer; Overload;
@@ -646,7 +655,7 @@ end;
 // TSQLiteDatabase
 //------------------------------------------------------------------------------
 
-constructor TSQLiteDatabase.Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding);
+constructor TSQLiteDatabase.Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding; const Password: AnsiString);
 var
   Msg: PAnsiChar;
   iResult: integer;
@@ -682,6 +691,20 @@ begin
       else
         raise ESqliteException.CreateFmt('Failed to open database "%s" : unknown error',
           [AFileName]);
+
+
+    if (Password <> '') then
+    begin
+      //db is encrypted
+      if not Assigned(sqlite3_key) then
+        raise ESQLiteException.Create('Loaded SQLite library does not support database encryption');
+
+      iResult := sqlite3_key(fDB, PAnsiChar(Password), Length(Password));
+      if iResult <> SQLITE_OK then
+      begin
+        RaiseError('Cannot encrypt database', '');
+      end;
+    end;
 
 //set a few configs
 //L.G. Do not call it here. Because busy handler is not setted here,
@@ -1033,6 +1056,21 @@ begin
   end
   else
     raise ESqliteException.Create('Transaction already open');
+end;
+
+procedure TSQLiteDatabase.ChangePassword(const NewPassword: AnsiString);
+begin
+  if Assigned(sqlite3_rekey) then
+  begin
+    if (sqlite3_rekey(fDB, PAnsiChar(NewPassword), Length(NewPassword)) <> SQLITE_OK) then
+    begin
+      RaiseError('Cannot change database password', '');
+    end;
+  end
+  else
+  begin
+    raise ESQLiteException.Create('Loaded SQLite library does not support database encryption');
+  end;
 end;
 
 procedure TSQLiteDatabase.Commit;
