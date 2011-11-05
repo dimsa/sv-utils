@@ -16,3 +16,4 @@ Based on [http://www.itwriting.com/blog/?page_id=659 Tim Anderson's] SQLite wrap
   * Lightweight
   * Supports adding [UserFunc custom user functions]
   * Can fetch data into your own data structure
+  * Have TDataset descendant (TSQLiteDataset) for using it in DB aware VCL projects
