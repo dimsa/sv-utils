@@ -132,6 +132,8 @@ var
   SQLite3_Step: function(hStmt: TSqliteStmt): integer; cdecl; // 'sqlite3_step';
   SQLite3_DataCount: function(hStmt: TSqliteStmt): integer; cdecl; // 'sqlite3_data_count';
   sqlite3_memory_used: function(): Int64; cdecl; // sqlite3_memory_used
+  sqlite3_key: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_key
+  sqlite3_rekey: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_rekey
 
 
   SQLite3_ColumnBlob: function(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; // 'sqlite3_column_blob';
@@ -380,6 +382,11 @@ begin
   end;
 end;
 
+function LoadProcSilent(const ProcName: string): Pointer;
+begin
+  Result := GetProcAddress(SQLite_Handle, PChar(ProcName));
+end;
+
 function ColValueToStr(Value: PChar): String;
 begin
   if (Value = nil) then
@@ -489,6 +496,9 @@ begin
       sqlite3_value_text16be := LoadProc('sqlite3_value_text16be');
       sqlite3_value_text16le := LoadProc('sqlite3_value_text16le');
       sqlite3_value_type := LoadProc('sqlite3_value_type');
+
+      sqlite3_key := LoadProcSilent('sqlite3_key');
+      sqlite3_rekey := LoadProcSilent('sqlite3_rekey');
 
       Result := (SQLite_Handle <> 0);
     end;

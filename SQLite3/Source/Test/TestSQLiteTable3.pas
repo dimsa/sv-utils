@@ -46,6 +46,8 @@ type
     procedure TestFunctions;
     procedure TestFunctions2;
     procedure TestSimpleDataLoad;
+    procedure TestEncryptedDB;
+    procedure TestChangePassword;
   end;
   // Test methods for class TSQLiteTable
 
@@ -182,6 +184,43 @@ begin
     Check((ReturnValue.ColCount > 0) and (ReturnValue.RowCount > 0));
   finally
     ReturnValue.Free;
+  end;
+end;
+
+procedure TestTSQLiteDatabase.TestEncryptedDB;
+var
+  DB, DB2: TSQLiteDatabase;
+  bOK: Boolean;
+begin
+  DeleteFile('encrypted.db');
+
+  DB := TSQLiteDatabase.Create('encrypted.db', seUTF8, 'password');
+  try
+    CheckTrue(DB <> nil);
+
+    DB.ExecSQL('CREATE TABLE IF NOT EXISTS testtable ([ID] INTEGER PRIMARY KEY,[OtherID] INTEGER NULL,[Name] VARCHAR (255),'+
+      '[Number] FLOAT, [notes] BLOB, [picture] BLOB COLLATE NOCASE)');
+
+    DB.ExecSQL('DELETE FROM testtable');
+
+    DB.ExecSQL('INSERT INTO testtable ([OtherID], [Name], [Number]) VALUES (1, ''encrypted'', 100)');
+    bOK := False;
+    DB2 := TSQLiteDatabase.Create('encrypted.db');
+    try
+      try
+        bOK := not DB2.TableExists('testtable');
+      except
+        bOK := True;
+      end;
+
+      CheckTrue(bOK);
+    finally
+      DB2.Free;
+    end;
+
+
+  finally
+    DB.Free;
   end;
 end;
 
@@ -406,6 +445,53 @@ begin
   finally
     BlobData.Free;
   end;
+end;
+
+procedure TestTSQLiteDatabase.TestChangePassword;
+var
+  DB, DB2: TSQLiteDatabase;
+  stmt: TSQLitePreparedStatement;
+  dst: TSQLiteUniTable;
+begin
+  DB := TSQLiteDatabase.Create('encrypted.db', seUTF8, 'password');
+  try
+    CheckTrue(DB <> nil);
+
+    stmt := DB.GetPreparedStatement('select * from testtable where OtherId = ?', [1]);
+    try
+      dst := stmt.ExecQuery;
+
+      try
+        CheckFalse(dst.EOF);
+
+        try
+          DB.ChangePassword('master');
+          CheckTrue(True);
+
+          DB2 := TSQLiteDatabase.Create('encrypted.db', seUTF8, 'master');
+          try
+            CheckTrue(DB2.TableExists('testtable'));
+          finally
+            DB2.Free;
+          end;
+
+
+          DB.ChangePassword('password');
+        except
+          CheckTrue(False, 'Cannot change password');
+        end;
+
+      finally
+        dst.Free;
+      end;
+    finally
+      stmt.Free;
+    end;
+
+  finally
+    DB.Free;
+  end;
+
 end;
 
 procedure TestTSQLiteDatabase.TestCommit;
