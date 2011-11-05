@@ -93,6 +93,7 @@ const
 type
   TSQLiteDBEncoding = (seUTF8, seUTF16);
 
+  ISQLitePreparedStatement = interface;
 
   ESQLiteException = class(Exception)
   end;
@@ -236,6 +237,8 @@ type
     /// <param name="Params">Parameter values for prepared query</param>
     /// <returns>TSQLitePreparedStatement instance</returns>
     function GetPreparedStatement(const SQL: string; const Params: array of TVarRec): TSQLitePreparedStatement; overload;
+    function GetPreparedStatementIntf(const SQL: string): ISQLitePreparedStatement; overload;
+    function GetPreparedStatementIntf(const SQL: string; const Params: array of TVarRec): ISQLitePreparedStatement; overload;
     /// <summary>
     /// Update blob value. Expects SQL of the form 'UPDATE MYTABLE SET MYFIELD = ? WHERE MYKEY = 1'
     /// </summary>
@@ -368,9 +371,57 @@ type
     property CountResult: integer read GetCountResult;
   end;
   /// <summary>
+  /// SQLite prepared statement interface - Linas Naginionis
+  /// </summary>
+  ISQLitePreparedStatement = interface
+    procedure ClearParams;
+
+    procedure SetParamInt(const name: string; value: int64); overload;
+    procedure SetParamFloat(const name: string; value: double); overload;
+    procedure SetParamText(const name: string; const value: string); overload;
+    procedure SetParamNull(const name: string); overload;
+    procedure SetParamInt(const I: Integer; value: int64); overload;
+    procedure SetParamFloat(const I: Integer; value: double); overload;
+    procedure SetParamText(const I: Integer; const value: string); overload;
+    procedure SetParamNull(const I: Integer); overload;
+    procedure SetParamDateTime(const I: Integer; const Value: TDateTime); overload;
+    procedure SetParamDateTime(const name: string; const Value: TDateTime); overload;
+    procedure SetParamDate(const I: Integer; const Value: TDate); overload;
+    procedure SetParamDate(const name: string; const Value: TDate); overload;
+    procedure SetParamVariant(const I: Integer; const Value: Variant); overload;
+    procedure SetParamVariant(const name: string; const Value: Variant); overload;
+    procedure SetParamBlob(const I: Integer; const Value: TStream); overload;
+    procedure SetParamBlob(const name: string; const Value: TStream); overload;
+    /// <summary>
+    /// Executes query which returns unidirectional table
+    /// </summary>
+    /// <returns>TSQLiteUniTable instance</returns>
+    function ExecQuery(): TSQLiteUniTable; overload;
+    function ExecQuery(const SQL: string): TSQLiteUniTable; overload;
+    function ExecQuery(const SQL: string; const Params: array of TVarRec): TSQLiteUniTable; overload;
+    /// <summary>
+    /// Executes SQL statement which should not return resultset
+    /// </summary>
+    /// <returns></returns>
+    function ExecSQL(): Boolean; overload;
+    function ExecSQL(const SQL: string): Boolean; overload;
+    function ExecSQL(var RowsAffected: Integer): Boolean; overload;
+    function ExecSQL(const SQL: string; var RowsAffected: Integer): Boolean; overload;
+    function ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean; overload;
+    /// <summary>
+    /// Prepares new SQL statement. Useful when using same TSQLitePreparedStatement with different queries
+    /// </summary>
+    /// <param name="SQL">SQL statement</param>
+    procedure PrepareStatement(const SQL: string = ''); overload;
+    procedure PrepareStatement(const SQL: string; const Params: array of TVarRec); overload;
+
+    function BindParameterCount: Integer;
+    function BindParameterName(const i: Integer): string;
+  end;
+  /// <summary>
   /// SQLite prepared statement - Linas Naginionis
   /// </summary>
-  TSQLitePreparedStatement = class
+  TSQLitePreparedStatement = class(TInterfacedObject, ISQLitePreparedStatement)
   private
     FSQL: string;
     FDB: TSQLiteDatabase;
@@ -748,6 +799,17 @@ function TSQLiteDatabase.GetPreparedStatement(const SQL: string;
   const Params: array of TVarRec): TSQLitePreparedStatement;
 begin
   Result := TSQLitePreparedStatement.Create(Self, SQL, Params);
+end;
+
+function TSQLiteDatabase.GetPreparedStatementIntf(const SQL: string): ISQLitePreparedStatement;
+begin
+  Result := GetPreparedStatement(SQL);
+end;
+
+function TSQLiteDatabase.GetPreparedStatementIntf(const SQL: string;
+  const Params: array of TVarRec): ISQLitePreparedStatement;
+begin
+  Result := GetPreparedStatement(SQL, Params);
 end;
 
 function TSQLiteDatabase.GetPreparedStatement(const SQL: string): TSQLitePreparedStatement;
