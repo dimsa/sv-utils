@@ -33,6 +33,7 @@ type
     procedure TestGetTableStrings;
     procedure TestGetPreparedStatement;
     procedure TestGetPreparedStatement1;
+    procedure TestGetPreparedStatementIntf;
     procedure TestUpdateBlob;
     procedure TestCommit;
     procedure TestRollback;
@@ -428,6 +429,17 @@ begin
   finally
     ReturnValue.Free;
   end;
+end;
+
+procedure TestTSQLiteDatabase.TestGetPreparedStatementIntf;
+var
+  ReturnValue: ISQLitePreparedStatement;
+  SQL: string;
+begin
+  SQL := 'select * from testtable where ID > ? and Number > ?';
+  ReturnValue := FSQLiteDatabase.GetPreparedStatementIntf(SQL, [5, 1.1]);
+
+  Check(ReturnValue.BindParameterCount = 2);
 end;
 
 procedure TestTSQLiteDatabase.TestUpdateBlob;
