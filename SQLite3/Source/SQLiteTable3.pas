@@ -94,6 +94,7 @@ type
   TSQLiteDBEncoding = (seUTF8, seUTF16);
 
   ISQLitePreparedStatement = interface;
+  ISQLiteTable = interface;
 
   ESQLiteException = class(Exception)
   end;
@@ -374,6 +375,9 @@ type
   /// SQLite prepared statement interface - Linas Naginionis
   /// </summary>
   ISQLitePreparedStatement = interface
+    function GetParams(index: Integer): TSQliteParam;
+    function GetParamCount: Integer;
+
     procedure ClearParams;
 
     procedure SetParamInt(const name: string; value: int64); overload;
@@ -399,6 +403,10 @@ type
     function ExecQuery(): TSQLiteUniTable; overload;
     function ExecQuery(const SQL: string): TSQLiteUniTable; overload;
     function ExecQuery(const SQL: string; const Params: array of TVarRec): TSQLiteUniTable; overload;
+
+    function ExecQueryIntf(): ISQLiteTable; overload;
+    function ExecQueryIntf(const SQL: string): ISQLiteTable; overload;
+    function ExecQueryIntf(const SQL: string; const Params: array of TVarRec): ISQLiteTable; overload;
     /// <summary>
     /// Executes SQL statement which should not return resultset
     /// </summary>
@@ -415,6 +423,8 @@ type
     procedure PrepareStatement(const SQL: string = ''); overload;
     procedure PrepareStatement(const SQL: string; const Params: array of TVarRec); overload;
 
+    property Params[index: Integer]: TSQliteParam read GetParams;
+    property ParamCount: Integer read GetParamCount;
     function BindParameterCount: Integer;
     function BindParameterName(const i: Integer): string;
   end;
@@ -471,6 +481,10 @@ type
     function ExecQuery(): TSQLiteUniTable; overload;
     function ExecQuery(const SQL: string): TSQLiteUniTable; overload;
     function ExecQuery(const SQL: string; const Params: array of TVarRec): TSQLiteUniTable; overload;
+
+    function ExecQueryIntf(): ISQLiteTable; overload;
+    function ExecQueryIntf(const SQL: string): ISQLiteTable; overload;
+    function ExecQueryIntf(const SQL: string; const Params: array of TVarRec): ISQLiteTable; overload;
     /// <summary>
     /// Executes SQL statement which should not return resultset
     /// </summary>
@@ -528,22 +542,64 @@ type
     function Value: Variant;
     function ValueDef(const Def: Variant): Variant;
   end;
+
+  /// <summary>
+  /// Interface of SQLite table
+  /// </summary>
+  ISQLiteTable = interface
+    procedure SetField(I: Integer; const Value: TSQLiteField);
+    function GetFieldCount: Cardinal;
+    function GetRow: Cardinal;
+    function GetEOF: Boolean;
+    function GetFieldsAsString(I: Cardinal): string;
+    function GetField(I: Integer): TSQLiteField;
+    procedure SetFields(I: Cardinal; const Value: Variant);
+    function GetFieldsVal(I: Cardinal): Variant;
+    function GetColumns(I: integer): string;
+    function GetFieldByNameAsString(const FieldName: string): string;
+    function GetFieldIndex(const FieldName: string): integer;
+    function GetFieldByName(const FieldName: string): TSQLiteField;
+    procedure SetFieldByName(const FieldName: string; const Value: TSQLiteField);
+
+    function FindField(const AFieldName: string): TSQLiteField;
+    function FieldAsInteger(I: Cardinal): int64;
+    function FieldAsBlob(I: Cardinal): TMemoryStream;
+    function FieldAsBlobPtr(I: Cardinal; out iNumBytes: integer): Pointer;
+    function FieldAsBlobText(I: Cardinal): string;
+    function FieldIsNull(I: Cardinal): Boolean;
+    function FieldAsString(I: Cardinal): string;
+    function FieldAsDouble(I: Cardinal): double;
+    function Next: Boolean;
+
+    property EOF: Boolean read GetEOF;
+    property FieldCount: Cardinal read GetFieldCount;
+    property FieldsAsString[I: Cardinal]: string read GetFieldsAsString;
+    property Fields[I: Integer]: TSQLiteField read GetField write SetField;
+    property FieldsVal[I: Cardinal]: Variant read GetFieldsVal write SetFields;
+    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName write SetFieldByName; default;
+    property FieldByNameAsString[const FieldName: string]: string read GetFieldByNameAsString;
+    property FieldIndex[const FieldName: string]: integer read GetFieldIndex;
+    property Columns[I: integer]: string read GetColumns;
+    property ColCount: Cardinal read GetFieldCount;
+    property Row: Cardinal read GetRow;
+  end;
+
   /// <summary>
   /// Unidirectional SQLite table for fastest data access and very small memory footprint
   /// </summary>
-  TSQLiteUniTable = class
+  TSQLiteUniTable = class(TInterfacedObject, ISQLiteTable)
   private
-    fColCount: cardinal;
+    fColCount: Cardinal;
     fCols: TDictionary<string,Integer>;
     FColTypes: array of Integer;
     FColNames: array of string;
     FFields: TObjectList<TSQLiteField>;
-    fRow: cardinal;
-    fEOF: boolean;
+    fRow: Cardinal;
+    fEOF: Boolean;
     fStmt: TSQLiteStmt;
     fDB: TSQLiteDatabase;
     fSQL: string;
-    function GetFieldsAsString(I: cardinal): string;
+    function GetFieldsAsString(I: Cardinal): string;
     function GetColumns(I: integer): string;
     function GetFieldByNameAsString(const FieldName: string): string;
     function GetFieldIndex(const FieldName: string): integer;
@@ -552,7 +608,11 @@ type
     procedure GetDataTypes;
     function GetField(I: Integer): TSQLiteField;
 
-    procedure SetField(I: Integer; const Value: TSQLiteField);  protected
+    procedure SetField(I: Integer; const Value: TSQLiteField);
+    function GetFieldCount: Cardinal;
+    function GetRow: Cardinal;
+    function GetEOF: Boolean;
+  protected
     procedure SetFields(I: Cardinal; const Value: Variant);
     function GetFieldsVal(I: Cardinal): Variant; virtual;
 
@@ -567,26 +627,26 @@ type
     /// <param name="AFieldName">name of the field</param>
     /// <returns>if field exists, returns TSQLiteField instance, else returns nil</returns>
     function FindField(const AFieldName: string): TSQLiteField;
-    function FieldAsInteger(I: cardinal): int64;
-    function FieldAsBlob(I: cardinal): TMemoryStream;
-    function FieldAsBlobPtr(I: cardinal; out iNumBytes: integer): Pointer;
-    function FieldAsBlobText(I: cardinal): string;
-    function FieldIsNull(I: cardinal): boolean;
-    function FieldAsString(I: cardinal): string;
-    function FieldAsDouble(I: cardinal): double;
-    function Next: boolean;
+    function FieldAsInteger(I: Cardinal): int64;
+    function FieldAsBlob(I: Cardinal): TMemoryStream;
+    function FieldAsBlobPtr(I: Cardinal; out iNumBytes: integer): Pointer;
+    function FieldAsBlobText(I: Cardinal): string;
+    function FieldIsNull(I: Cardinal): Boolean;
+    function FieldAsString(I: Cardinal): string;
+    function FieldAsDouble(I: Cardinal): double;
+    function Next: Boolean;
 
-    property EOF: boolean read FEOF;
-    property FieldCount: Cardinal read fColCount;
-    property FieldsAsString[I: cardinal]: string read GetFieldsAsString;
+    property EOF: Boolean read GetEOF;
+    property FieldCount: Cardinal read GetFieldCount;
+    property FieldsAsString[I: Cardinal]: string read GetFieldsAsString;
     property Fields[I: Integer]: TSQLiteField read GetField write SetField;
     property FieldsVal[I: Cardinal]: Variant read GetFieldsVal write SetFields;
     property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName write SetFieldByName; default;
     property FieldByNameAsString[const FieldName: string]: string read GetFieldByNameAsString;
     property FieldIndex[const FieldName: string]: integer read GetFieldIndex;
     property Columns[I: integer]: string read GetColumns;
-    property ColCount: cardinal read fColCount;
-    property Row: cardinal read fRow;
+    property ColCount: Cardinal read GetFieldCount;
+    property Row: Cardinal read GetRow;
     property SQL: string read fSQL write fSQL;
     property Stmt: TSQLiteStmt read FStmt;
   end;
@@ -1882,6 +1942,11 @@ begin
 
 end;
 
+function TSQLiteUniTable.GetEOF: Boolean;
+begin
+  Result := fEOF;
+end;
+
 function TSQLiteUniTable.FieldAsBlob(I: cardinal): TMemoryStream;
 var
   iNumBytes: integer;
@@ -1989,6 +2054,11 @@ begin
   Result := GetFieldsAsString(self.GetFieldIndex(FieldName));
 end;
 
+function TSQLiteUniTable.GetFieldCount: Cardinal;
+begin
+  Result := fColCount;
+end;
+
 function TSQLiteUniTable.GetFieldIndex(const FieldName: string): integer;
 begin
   if (fCols = nil) then
@@ -2061,6 +2131,11 @@ begin
   end;
 end;
 
+
+function TSQLiteUniTable.GetRow: cardinal;
+begin
+  Result := fRow;
+end;
 
 function TSQLiteUniTable.Next: boolean;
 var
@@ -2540,6 +2615,21 @@ begin
 
   {TODO -oLinas -cGeneral : exec query and get resultset}
   Result := TSQLiteUniTable.Create(FDB, FStmt);
+end;
+
+function TSQLitePreparedStatement.ExecQueryIntf(const SQL: string; const Params: array of TVarRec): ISQLiteTable;
+begin
+  Result := ExecQuery(SQL, Params);
+end;
+
+function TSQLitePreparedStatement.ExecQueryIntf(): ISQLiteTable;
+begin
+  Result := ExecQuery();
+end;
+
+function TSQLitePreparedStatement.ExecQueryIntf(const SQL: string): ISQLiteTable;
+begin
+  Result := ExecQuery(SQL);
 end;
 
 function TSQLitePreparedStatement.ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean;
