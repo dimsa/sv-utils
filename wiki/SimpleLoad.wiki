@@ -1,36 +1,30 @@
 #summary Simple data loading using unidirectional table.
 #labels Featured,Phase-Implementation
 
+No need to free sqlite prepared statements or tables when getting them as interfaces:
+
 = Simple data loading using unidirectional table=
 
 {{{
 procedure TestTSQLiteDatabase.TestSimpleDataLoad;
 var
   DB: TSQLiteDatabase;
-  stmt: TSQLitePreparedStatement;
-  dst: TSQLiteUniTable;
+  stmt: ISQLitePreparedStatement;
+  dst: ISQLiteTable;
   iVal: Integer;
 begin
   DB := TSQLiteDatabase.Create('test.db');
   try
     //prepare statement with param value = 10
-    stmt := DB.GetPreparedStatement('select * from testtable where ID > ?', [10]);
-    try
+    stmt := DB.GetPreparedStatementIntf('select * from testtable where ID > ?', [10]);
       //execute query and return the resultset
-      dst := stmt.ExecQuery;
-      try
-        while not dst.EOF do
-        begin
-          //get data from resultset
-          iVal := dst['ID'].AsInteger;
+    dst := stmt.ExecQueryIntf;
+    while not dst.EOF do
+    begin
+      //get data from resultset
+      iVal := dst['ID'].AsInteger;
 
-          dst.Next;
-        end;
-      finally
-        dst.Free;
-      end;
-    finally
-      stmt.Free;
+      dst.Next;
     end;
   finally
     DB.Free;
