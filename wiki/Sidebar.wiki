@@ -3,7 +3,7 @@
   * [Utils Utilities]
     * [TPathBuilder TPathBuilder]
   * [SQLite3 SQLite3 4 Delphi] 
-    * [Intro Introduction]
+    * [Intro "SQLite3 4 Delphi" introduction]
     * [SimpleLoad Simple data loading]
     * [UserFunc User functions]
     * [Encryption Database encryption]
