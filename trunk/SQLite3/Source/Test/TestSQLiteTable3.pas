@@ -34,6 +34,7 @@ type
     procedure TestGetPreparedStatement;
     procedure TestGetPreparedStatement1;
     procedure TestGetPreparedStatementIntf;
+    procedure TestGetPreparedStatementIntfAndGetQuery;
     procedure TestUpdateBlob;
     procedure TestCommit;
     procedure TestRollback;
@@ -89,6 +90,7 @@ type
     procedure TestExecQuery;
     procedure TestExecQuery1;
     procedure TestExecQuery2;
+    procedure TestExecQueryIntf;
     procedure TestExecSQL;
     procedure TestExecSQL1;
     procedure TestExecSQL2;
@@ -440,6 +442,17 @@ begin
   ReturnValue := FSQLiteDatabase.GetPreparedStatementIntf(SQL, [5, 1.1]);
 
   Check(ReturnValue.BindParameterCount = 2);
+end;
+
+procedure TestTSQLiteDatabase.TestGetPreparedStatementIntfAndGetQuery;
+var
+  ReturnValue: Int64;
+  SQL: string;
+begin
+  SQL := 'select * from testtable where ID > ? and Number > ?';
+  ReturnValue := FSQLiteDatabase.GetPreparedStatementIntf(SQL, [5, 1.1]).ExecQueryIntf.FieldByName['ID'].AsInteger;
+
+  CheckTrue(ReturnValue > 5);
 end;
 
 procedure TestTSQLiteDatabase.TestUpdateBlob;
@@ -916,6 +929,18 @@ begin
   finally
     ReturnValue.Free;
   end;
+end;
+
+procedure TestTSQLitePreparedStatement.TestExecQueryIntf;
+var
+  ReturnValue: ISQLiteTable;
+  SQL: string;
+begin
+  SQL := 'select * from testtable where ID = ?';
+  FSQLitePreparedStatement.ClearParams;
+  FSQLitePreparedStatement.PrepareStatement(SQL);
+  ReturnValue := FSQLitePreparedStatement.ExecQueryIntf(SQL, [10]);
+  Check(ReturnValue.Fields[0].AsInteger = 10);
 end;
 
 procedure TestTSQLitePreparedStatement.TestExecSQL;
