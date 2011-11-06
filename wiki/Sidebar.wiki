@@ -6,3 +6,4 @@
     * [Intro Introduction]
     * [SimpleLoad Simple data loading]
     * [UserFunc User functions]
+    * [Encryption Database encryption]
