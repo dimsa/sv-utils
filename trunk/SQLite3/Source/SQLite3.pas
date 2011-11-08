@@ -86,9 +86,47 @@ type
   Psqlite3_context = pointer;
   Psqlite3_value = ppchar;
 
+
+  {Authorizer Action Codes}
+  TSQLiteActionCode = (
+    SQLITE_CREATE_INDEX          =1,   { Index Name      Table Name      }
+    SQLITE_CREATE_TABLE          =2,   { Table Name      NULL            }
+    SQLITE_CREATE_TEMP_INDEX     =3,   { Index Name      Table Name      }
+    SQLITE_CREATE_TEMP_TABLE     =4,   { Table Name      NULL            }
+    SQLITE_CREATE_TEMP_TRIGGER   =5,   { Trigger Name    Table Name      }
+    SQLITE_CREATE_TEMP_VIEW      =6,   { View Name       NULL            }
+    SQLITE_CREATE_TRIGGER        =7,   { Trigger Name    Table Name      }
+    SQLITE_CREATE_VIEW           =8,   { View Name       NULL            }
+    SQLITE_DELETE                =9,   { Table Name      NULL            }
+    SQLITE_DROP_INDEX           =10,   { Index Name      Table Name      }
+    SQLITE_DROP_TABLE           =11,   { Table Name      NULL            }
+    SQLITE_DROP_TEMP_INDEX      =12,   { Index Name      Table Name      }
+    SQLITE_DROP_TEMP_TABLE      =13,   { Table Name      NULL            }
+    SQLITE_DROP_TEMP_TRIGGER    =14,   { Trigger Name    Table Name      }
+    SQLITE_DROP_TEMP_VIEW       =15,   { View Name       NULL            }
+    SQLITE_DROP_TRIGGER         =16,   { Trigger Name    Table Name      }
+    SQLITE_DROP_VIEW            =17,   { View Name       NULL            }
+    SQLITE_INSERT               =18,   { Table Name      NULL            }
+    SQLITE_PRAGMA               =19,   { Pragma Name     1st arg or NULL }
+    SQLITE_READ                 =20,   { Table Name      Column Name     }
+    SQLITE_SELECT               =21,   { NULL            NULL            }
+    SQLITE_TRANSACTION          =22,   { Operation       NULL            }
+    SQLITE_UPDATE               =23,   { Table Name      Column Name     }
+    SQLITE_ATTACH               =24,   { Filename        NULL            }
+    SQLITE_DETACH               =25,   { Database Name   NULL            }
+    SQLITE_ALTER_TABLE          =26,   { Database Name   Table Name      }
+    SQLITE_REINDEX              =27,   { Index Name      NULL            }
+    SQLITE_ANALYZE              =28,   { Table Name      NULL            }
+    SQLITE_CREATE_VTABLE        =29,   { Table Name      Module Name     }
+    SQLITE_DROP_VTABLE          =30,   { Table Name      Module Name     }
+    SQLITE_FUNCTION             =31,   { NULL            Function Name   }
+    SQLITE_SAVEPOINT            =32,   { Operation       Savepoint Name  }
+    SQLITE_COPY                 = 0);   { No longer used }
+
   TxFinal = procedure(sqlite3_context: Psqlite3_context);
   TxFunc = procedure(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: Psqlite3_value);
   TxStep = procedure(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: Psqlite3_value);
+  TxAuth = function(pUserData: Pointer; ActionCode: Integer; Det1, Det2, Det3, Det4: PAnsiChar): Integer;
 
   PPAnsiCharArray = ^TPCharArray;
   TPAnsiCharArray = array[0 .. (MaxInt div SizeOf(PAnsiChar))-1] of PAnsiChar;
@@ -134,7 +172,7 @@ var
   sqlite3_memory_used: function(): Int64; cdecl; // sqlite3_memory_used
   sqlite3_key: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_key
   sqlite3_rekey: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_rekey
-
+  sqlite3_set_authorizer: function(db: TSQLiteDB; xAuth: TxAuth; pUserData: Pointer): Integer; cdecl; //sqlite3_set_authorizer
 
   SQLite3_ColumnBlob: function(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; // 'sqlite3_column_blob';
   SQLite3_ColumnBytes: function(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; // 'sqlite3_column_bytes';
@@ -496,6 +534,7 @@ begin
       sqlite3_value_text16be := LoadProc('sqlite3_value_text16be');
       sqlite3_value_text16le := LoadProc('sqlite3_value_text16le');
       sqlite3_value_type := LoadProc('sqlite3_value_type');
+      sqlite3_set_authorizer := LoadProc('sqlite3_set_authorizer');
 
       sqlite3_key := LoadProcSilent('sqlite3_key');
       sqlite3_rekey := LoadProcSilent('sqlite3_rekey');
