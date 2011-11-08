@@ -327,7 +327,7 @@ type
     procedure AddCustomCollate(const name: string; xCompare: TCollateXCompare);
     //adds collate named SYSTEM for correct data sorting by user's locale
     Procedure AddSystemCollate;
-    procedure ParamsClear; deprecated;
+    procedure ParamsClear;
     procedure AddParamInt(const name: string; value: int64); deprecated;
     procedure AddParamFloat(const name: string; value: double); deprecated;
     procedure AddParamText(const name: string; const value: string); deprecated;
@@ -1127,6 +1127,7 @@ begin
   Result := TSQLiteTable.Create(Self, SQL);
 end;
 
+{$HINTS OFF}
 function TSQLiteDatabase.GetUniTable(const SQL: string): TSQLiteUniTable;
 var
   stmt: TSQLitePreparedStatement;
@@ -1140,6 +1141,7 @@ begin
     stmt.Free;
   end;
 end;
+{$HINTS ON}
 
 class procedure TSQLiteDatabase.InitDefaultColumnTypes;
 var
@@ -1358,6 +1360,7 @@ begin
   {$ENDIF}
 end;
 
+{$HINTS OFF}
 function TSQLiteDatabase.Attach(const DBFilename, AttachedDBName: string): Boolean;
 var
   stmt: TSQLitePreparedStatement;
@@ -1370,6 +1373,7 @@ begin
     stmt.Free;
   end;
 end;
+{$HINTS ON}
 
 procedure TSQLiteDatabase.ParamsClear;
 var
@@ -2770,6 +2774,7 @@ begin
   inherited Destroy;
 end;
 
+{$HINTS OFF}
 function TSQLitePreparedStatement.ExecQuery(const SQL: string; const Params: array of TVarRec): TSQLiteUniTable;
 begin
   Result := nil;
@@ -2784,6 +2789,7 @@ begin
   {TODO -oLinas -cGeneral : exec query and get resultset}
   Result := TSQLiteUniTable.Create(FDB, FStmt);
 end;
+{$HINTS ON}
 
 function TSQLitePreparedStatement.ExecQueryIntf(const SQL: string; const Params: array of TVarRec): ISQLiteTable;
 begin
@@ -2800,6 +2806,7 @@ begin
   Result := ExecQuery(SQL);
 end;
 
+{$HINTS OFF}
 function TSQLitePreparedStatement.ExecSQL(const SQL: string; const Params: array of TVarRec): Boolean;
 var
   iStepResult: Integer;
@@ -2833,6 +2840,7 @@ begin
     end;
   end;
 end;
+{$HINTS ON}
 
 function TSQLitePreparedStatement.ExecSQL(var RowsAffected: Integer): Boolean;
 begin
