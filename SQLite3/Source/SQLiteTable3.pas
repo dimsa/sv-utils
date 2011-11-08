@@ -92,9 +92,14 @@ const
 
 type
   TSQLiteDBEncoding = (seUTF8, seUTF16);
-
+  //forward declarations
   ISQLitePreparedStatement = interface;
   ISQLiteTable = interface;
+  TSQLiteDatabase = class;
+  TSQLiteTable = class;
+  TSQLiteUniTable = class;
+  TSQLitePreparedStatement = class;
+  TSQLiteFunctions = class;
 
   ESQLiteException = class(Exception)
   end;
@@ -113,21 +118,18 @@ type
   end;
 
   THookQuery = procedure(Sender: TObject;const SQL: String) of object;
+  TAuthEvent = procedure(Sender: TSQLiteDatabase; ActionCode: TSQLiteActionCode;
+    const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer) of object;
 
   TSQLiteQuery = record
     SQL: String;
     Statement: TSQLiteStmt;
   end;
 
-  TSQLiteTable = class;
-  TSQLiteUniTable = class;
-  TSQLitePreparedStatement = class;
-  TSQLiteDatabase = class;
-  TSQLiteFunctions = class;
-
   TSQLiteUserFunc = reference to procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar);
   TSQLiteUserFuncFinal = reference to procedure(sqlite3_context: Psqlite3_context);
-
+//  TSQLiteAuthFunc = reference to function(DB: TSQLiteDatabase; ActionCode: Integer;
+//    const AArg1, AArg2, AArg3, AArg4: String): Integer;
 
   TSQLiteFuncType = (sftScalar, sftAggregate);
 
@@ -174,7 +176,7 @@ type
   /// <summary>
   /// SQLite database class
   /// </summary>
-  TSQLiteDatabase = class
+  TSQLiteDatabase = class(TComponent)
   class var
     FColumnTypes: TDictionary<string,Integer>;
   private
@@ -186,35 +188,52 @@ type
     FFormatSett: TFormatSettings;
     FFilename: string;
     FFunctions: TSQLiteFunctions;
+    FEncoding: TSQLiteDBEncoding;
+    FConnected: Boolean;
+    FOnAuthorize: TAuthEvent;
+    FOnAfterOpen: TNotifyEvent;
     procedure RaiseError(const s: string; const SQL: string);
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
     class procedure InitDefaultColumnTypes;
+    procedure SetFilename(const Value: string);
+
+    procedure SetConnected(const Value: Boolean);
+
+    procedure SetOnAuthorize(const Value: TAuthEvent);
   protected
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
   public
-    /// <summary>
-    /// Creates (if file doesn't exist) or loads database from given file using default encoding
-    /// </summary>
-    /// <param name="AFileName">filename of sqlite database</param>
-    /// <param name="DefaultEncoding">encoding to use when creating new database</param>
-    /// <param name="Password">Password to encrypt database. Notes: default sqlite.dll does not support database encryption.
-    /// To encrypt your database you must use http://system.data.sqlite.org/index.html/doc/trunk/www/index.wiki or
-    /// http://sourceforge.net/projects/wxcode/files/Components/wxSQLite3/ library file (rename it to sqlite3.dll) </param>
-    constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8; const Password: AnsiString = '');
+    {$REGION 'Doc'}
+      /// <summary>
+      /// Creates (if file doesn't exist) or loads database from given file using default encoding
+      /// </summary>
+      /// <param name="AFileName">filename of sqlite database</param>
+      /// <param name="DefaultEncoding">encoding to use when creating new database</param>
+      /// <param name="Password">Password to encrypt database. Notes: default sqlite.dll does not support database encryption.
+      /// To encrypt your database you must use http://system.data.sqlite.org/index.html/doc/trunk/www/index.wiki or
+      /// http://sourceforge.net/projects/wxcode/files/Components/wxSQLite3/ library file (rename it to sqlite3.dll) </param>
+    {$ENDREGION}
+    constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8;
+      const Password: AnsiString = ''; AOwner: TComponent = nil); reintroduce; overload;
+    constructor Create(AOwner: TComponent); reintroduce; overload;
     destructor Destroy; override;
-     /// <summary>
-     /// Adds new supported column type
-     /// </summary>
-     /// <param name="ColTypeName">Column Type Name</param>
-     /// <param name="ColType">Column Type constant, e.g. dtStr</param>
+    {$REGION 'Doc'}
+       /// <summary>
+       /// Adds new supported column type
+       /// </summary>
+       /// <param name="ColTypeName">Column Type Name</param>
+       /// <param name="ColType">Column Type constant, e.g. dtStr</param>
+    {$ENDREGION}
     class procedure AddNewSupportedColumnType(const ColTypeName: string; ColType: Integer = dtStr);
-    /// <summary>
-    /// Executes sql statement and returns table with results
-    /// </summary>
-    /// <param name="SQL">SQL statement which should return resultset</param>
-    /// <returns>TSQLiteTable instance</returns>
+    {$REGION 'Doc'}
+      /// <summary>
+      /// Executes sql statement and returns table with results
+      /// </summary>
+      /// <param name="SQL">SQL statement which should return resultset</param>
+      /// <returns>TSQLiteTable instance</returns>
+    {$ENDREGION}
     function GetTable(const SQL: String): TSQLiteTable;
     /// <summary>
     /// Executes SQL statement
@@ -231,21 +250,25 @@ type
     function GetTableString(const SQL: String): string;
     procedure GetTableStrings(const SQL: String; const Value: TStrings);
     function GetPreparedStatement(const SQL: string): TSQLitePreparedStatement; overload;
-    /// <summary>
-    /// returns newly created prepared statment
-    /// </summary>
-    /// <param name="SQL">SQL statement string</param>
-    /// <param name="Params">Parameter values for prepared query</param>
-    /// <returns>TSQLitePreparedStatement instance</returns>
+    {$REGION 'Doc'}
+      /// <summary>
+      /// returns newly created prepared statment
+      /// </summary>
+      /// <param name="SQL">SQL statement string</param>
+      /// <param name="Params">Parameter values for prepared query</param>
+      /// <returns>TSQLitePreparedStatement instance</returns>
+    {$ENDREGION}
     function GetPreparedStatement(const SQL: string; const Params: array of TVarRec): TSQLitePreparedStatement; overload;
     function GetPreparedStatementIntf(const SQL: string): ISQLitePreparedStatement; overload;
     function GetPreparedStatementIntf(const SQL: string; const Params: array of TVarRec): ISQLitePreparedStatement; overload;
-    /// <summary>
-    /// Update blob value. Expects SQL of the form 'UPDATE MYTABLE SET MYFIELD = ? WHERE MYKEY = 1'
-    /// </summary>
-    /// <param name="SQL">update statement</param>
-    /// <param name="BlobData">BlobData stream</param>
-    procedure UpdateBlob(const SQL: String; BlobData: TStream);
+    {$REGION 'Doc'}
+      /// <summary>
+      /// Update blob value. Expects SQL of the form 'UPDATE MYTABLE SET MYFIELD = ? WHERE MYKEY = 1'
+      /// </summary>
+      /// <param name="SQL">update statement</param>
+      /// <param name="BlobData">BlobData stream</param>
+    {$ENDREGION}
+    procedure UpdateBlob(const SQL: String; BlobData: TStream); deprecated;
     /// <summary>
     /// Starts new transaction. Speeds up drastically data inserts, updates, deletes.
     /// </summary>
@@ -285,6 +308,13 @@ type
     /// <param name="NewPassword">New password: Ansistring</param>
     procedure ChangePassword(const NewPassword: AnsiString);
 
+    procedure Open(const Password: AnsiString = '');
+    procedure Close;
+    /// <summary>
+    /// This routine sets a busy handler that sleeps for a specified amount of time when a table is locked.
+    /// The handler will sleep multiple times until at least "ms" milliseconds of sleeping have accumulated.
+    /// </summary>
+    /// <param name="Value">Time is miliseconds</param>
     procedure SetTimeout(Value: integer);
     function Backup(TargetDB: TSQLiteDatabase): integer; Overload;
     function Backup(TargetDB: TSQLiteDatabase; const targetName: String; const sourceName: String): integer; Overload;
@@ -297,27 +327,37 @@ type
     procedure AddParamFloat(const name: string; value: double); deprecated;
     procedure AddParamText(const name: string; const value: string); deprecated;
     procedure AddParamNull(const name: string); deprecated;
-    /// <summary>
-    /// Attached another database into the current one with the given alias (name)
-    /// </summary>
-    /// <param name="DBFilename">filename of the database to attach</param>
-    /// <param name="AttachedDBName">name of the attached database</param>
-    /// <returns>true; attached succesfully</returns>
+    {$REGION 'Doc'}
+      /// <summary>
+      /// Attached another database into the current one with the given alias (name)
+      /// </summary>
+      /// <param name="DBFilename">filename of the database to attach</param>
+      /// <param name="AttachedDBName">name of the attached database</param>
+      /// <returns>true; attached succesfully</returns>
+    {$ENDREGION}
     function Attach(const DBFilename: string; const AttachedDBName: string): Boolean;
-    property Filename: string read FFilename;
+    /// <summary>
+    /// Database filename. Opens the database when filename is being set
+    /// </summary>
+    property Filename: string read FFilename write SetFilename;
     /// <summary>
     /// Format settings to use for DateTime fields
     /// </summary>
     property FmtSett: TFormatSettings read FFormatSett;
     property DB: TSQLiteDB read fDB;
   published
-    property IsTransactionOpen: boolean read fInTrans;
+    property Connected: Boolean read FConnected write SetConnected default False;
+    property IsTransactionOpen: Boolean read fInTrans;
+    property Encoding: TSQLiteDBEncoding read FEncoding write FEncoding default seUTF8;
     property Functions: TSQLiteFunctions read FFunctions;
     //database rows that were changed (or inserted or deleted) by the most recent SQL statement
     property RowsChanged : integer read getRowsChanged;
-    property Synchronised: boolean read FSync write SetSynchronised;
-    property OnQuery: THookQuery read FOnQuery write FOnQuery;
+    property Synchronised: boolean read FSync write SetSynchronised default False;
 
+    //events
+    property OnAfterOpen: TNotifyEvent read FOnAfterOpen write FOnAfterOpen;
+    property OnQuery: THookQuery read FOnQuery write FOnQuery;
+    property OnAuthorize: TAuthEvent read FOnAuthorize write SetOnAuthorize;
   end;
 
   /// <summary>
@@ -440,8 +480,8 @@ type
     FParamsBound: Boolean;
     procedure BindParams;
     procedure SetParams(const Params: array of TVarRec);
-    function FindParam(const I: Integer): TSQliteParam; overload;
-    function FindParam(const name: string): TSQliteParam; overload;
+   // function FindParam(const I: Integer): TSQliteParam; overload;
+   // function FindParam(const name: string): TSQliteParam; overload;
     procedure SetSQL(const Value: string);
     function GetParamCount: Integer;
     function GetParams(index: Integer): TSQliteParam;
@@ -740,6 +780,27 @@ begin
   end;
 end;
 
+function DoAuthorize(pUserData: Pointer; ActionCode: Integer; Det1, Det2, Det3, Det4: PAnsiChar): Integer; cdecl;
+var
+  DB: TSQLiteDatabase;
+  iRes: Integer;
+begin
+  Result := SQLITE_OK;
+  DB := TSQLiteDatabase(pUserData);
+
+  if Assigned(DB.FOnAuthorize) then
+  begin
+    iRes := SQLITE_OK;
+
+    DB.FOnAuthorize(DB, TSQLiteActionCode(ActionCode), UTF8ToString(Det1), UTF8ToString(Det2),
+      UTF8ToString(Det3), UTF8ToString(Det4), iRes);
+
+    Result := iRes;
+
+  end;
+end;
+
+
 {$IFDEF WIN32}
 function SystemCollate(Userdta: pointer; Buf1Len: integer; Buf1: pointer;
     Buf2Len: integer; Buf2: pointer): integer; cdecl;
@@ -766,12 +827,11 @@ end;
 // TSQLiteDatabase
 //------------------------------------------------------------------------------
 
-constructor TSQLiteDatabase.Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding; const Password: AnsiString);
-var
-  Msg: PAnsiChar;
-  iResult: integer;
+constructor TSQLiteDatabase.Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding;
+  const Password: AnsiString; AOwner: TComponent);
 begin
-  inherited Create;
+  inherited Create(AOwner);
+  FOnAuthorize := nil;
   fParams := TList.Create;
   FFilename := AFileName;
   FFormatSett := TFormatSettings.Create();
@@ -780,66 +840,19 @@ begin
   FFormatSett.LongDateFormat := FFormatSett.ShortDateFormat + ' HH:MM:SS';
   FFunctions := TSQLiteFunctions.Create(Self);
   self.fInTrans := False;
-
-  Msg := nil;
-  try
-    case DefaultEncoding of
-      seUTF8: iResult := SQLite3_Open(PAnsiChar(UTF8Encode(AFileName)), Fdb);
-      seUTF16: iResult := SQLite3_Open16(PChar(AFileName), Fdb);
-    end;
-
-
-
-//    iResult := SQLite3_Open(PAnsiChar(AnsiString(FileName)), Fdb);
-
-    if iResult <> SQLITE_OK then
-      if Assigned(Fdb) then
-      begin
-        Msg := Sqlite3_ErrMsg(Fdb);
-        raise ESqliteException.CreateFmt('Failed to open database "%s" : %s',
-          [AFileName, Msg]);
-      end
-      else
-        raise ESqliteException.CreateFmt('Failed to open database "%s" : unknown error',
-          [AFileName]);
-
-
-    if (Password <> '') then
-    begin
-      //db is encrypted
-      if not Assigned(sqlite3_key) then
-        raise ESQLiteException.Create('Loaded SQLite library does not support database encryption');
-
-      iResult := sqlite3_key(fDB, PAnsiChar(Password), Length(Password));
-      if iResult <> SQLITE_OK then
-      begin
-        RaiseError('Cannot encrypt database', '');
-      end;
-    end;
-
-//set a few configs
-//L.G. Do not call it here. Because busy handler is not setted here,
-// any share violation causing exception!
-
-//    self.ExecSQL('PRAGMA SYNCHRONOUS=NORMAL;');
-//    self.ExecSQL('PRAGMA temp_store = MEMORY;');
-
-  finally
-    if Assigned(Msg) then
-      SQLite3_Free(Msg);
-  end;
-
+  FEncoding := DefaultEncoding;
+  FOnAfterOpen := nil;
+  Open(Password);
 end;
 
-//..............................................................................
+constructor TSQLiteDatabase.Create(AOwner: TComponent);
+begin
+  Create('');
+end;
 
 destructor TSQLiteDatabase.Destroy;
 begin
-  if self.fInTrans then
-    self.Rollback;  //assume rollback
-  if Assigned(fDB) then
-    SQLite3_Close(fDB);
-  ParamsClear;
+  Close;
   fParams.Free;
   FFunctions.Free;
   inherited;
@@ -1112,6 +1125,65 @@ begin
   end;
 end;
 
+procedure TSQLiteDatabase.Open(const Password: AnsiString);
+var
+  Msg: PAnsiChar;
+  iResult: Integer;
+begin
+  Msg := nil;
+  try
+    iResult := SQLITE_OK;
+
+    case FEncoding of
+      seUTF8: iResult := SQLite3_Open(PAnsiChar(UTF8Encode(FFileName)), Fdb);
+      seUTF16: iResult := SQLite3_Open16(PChar(FFileName), Fdb);
+    end;
+
+
+
+//    iResult := SQLite3_Open(PAnsiChar(AnsiString(FileName)), Fdb);
+
+    if iResult <> SQLITE_OK then
+      if Assigned(Fdb) then
+      begin
+        Msg := Sqlite3_ErrMsg(Fdb);
+        raise ESqliteException.CreateFmt('Failed to open database "%s" : %s',
+          [FFileName, Msg]);
+      end
+      else
+        raise ESqliteException.CreateFmt('Failed to open database "%s" : unknown error',
+          [FFileName]);
+
+
+    if (Password <> '') then
+    begin
+      //db is encrypted
+      if not Assigned(sqlite3_key) then
+        raise ESQLiteException.Create('Loaded SQLite library does not support database encryption');
+
+      iResult := sqlite3_key(fDB, PAnsiChar(Password), Length(Password));
+      if iResult <> SQLITE_OK then
+      begin
+        RaiseError('Cannot encrypt database', '');
+      end;
+    end;
+
+//set a few configs
+//L.G. Do not call it here. Because busy handler is not setted here,
+// any share violation causing exception!
+
+//    self.ExecSQL('PRAGMA SYNCHRONOUS=NORMAL;');
+//    self.ExecSQL('PRAGMA temp_store = MEMORY;');
+    if Assigned(FOnAfterOpen) then
+      FOnAfterOpen(Self);
+
+
+  finally
+    if Assigned(Msg) then
+      SQLite3_Free(Msg);
+  end;
+end;
+
 function TSQLiteDatabase.GetTableValue(const SQL: string): int64;
 var
   Table: TSQLiteUniTable;
@@ -1193,6 +1265,15 @@ begin
   begin
     raise ESQLiteException.Create('Loaded SQLite library does not support database encryption');
   end;
+end;
+
+procedure TSQLiteDatabase.Close;
+begin
+  if self.fInTrans then
+    self.Rollback;  //assume rollback
+  if Assigned(fDB) then
+    SQLite3_Close(fDB);
+  ParamsClear;
 end;
 
 procedure TSQLiteDatabase.Commit;
@@ -1321,6 +1402,48 @@ begin
   par.name := name;
   par.valuetype := SQLITE_NULL;
   fParams.Add(par);
+end;
+
+procedure TSQLiteDatabase.SetConnected(const Value: Boolean);
+begin
+  if Value <> FConnected then
+  begin
+    if FConnected and not Value then
+      Close;
+
+    if Value then
+      Open;
+
+    FConnected := Value;
+  end;
+
+end;
+
+procedure TSQLiteDatabase.SetFilename(const Value: string);
+begin
+  if (Value <> FFilename) then
+  begin
+    FFilename := Value;
+
+    if FConnected then
+      Close;
+
+    Open;
+  end;
+end;
+
+procedure TSQLiteDatabase.SetOnAuthorize(const Value: TAuthEvent);
+begin
+  FOnAuthorize := Value;
+
+  if Assigned(FOnAuthorize) then
+  begin
+    sqlite3_set_authorizer(fDB, @DoAuthorize, Self);
+  end
+  else
+  begin
+    sqlite3_set_authorizer(fDB, nil, nil);
+  end;
 end;
 
 procedure TSQLiteDatabase.SetParams(Stmt: TSQLiteStmt);
@@ -2774,6 +2897,7 @@ begin
   end;
 end;
 
+(*
 function TSQLitePreparedStatement.FindParam(const name: string): TSQliteParam;
 var
   par: TSQliteParam;
@@ -2789,6 +2913,19 @@ begin
     end;
   end;
 end;
+*)
+
+{
+function TSQLitePreparedStatement.FindParam(const I: Integer): TSQliteParam;
+begin
+  Result := nil;
+
+  if (I > 0) and (I <= fParams.Count) then
+  begin
+    Result := fParams[I-1];
+  end;
+end;
+ }
 
 function TSQLitePreparedStatement.GetParamCount: Integer;
 begin
@@ -2805,16 +2942,6 @@ begin
   PrepareStatement(SQL);
 
   SetParams(Params);
-end;
-
-function TSQLitePreparedStatement.FindParam(const I: Integer): TSQliteParam;
-begin
-  Result := nil;
-
-  if (I > 0) and (I <= fParams.Count) then
-  begin
-    Result := fParams[I-1];
-  end;
 end;
 
 procedure TSQLitePreparedStatement.PrepareStatement(const SQL: string);
@@ -2847,7 +2974,7 @@ begin
   Result := '';
   if FStmt <> nil then
   begin
-    Result := sqlite3_bind_parameter_name(FStmt, i);
+    Result := UTF8ToString(sqlite3_bind_parameter_name(FStmt, i));
   end;
 end;
 
@@ -3058,7 +3185,7 @@ var
   Val: PSQLiteFuncs;
 begin
   New(Val);
-  Val.FuncName := UpperCase(FuncName);
+  Val.FuncName := UpperCase(UTF8ToString(FuncName));
   Val.Funcs := Self;
   Val.AFunc := nil;
   Val.AStepFunc := AStepFunc;
@@ -3071,7 +3198,7 @@ begin
 
   if iRes <> SQLITE_OK then
   begin
-    FDB.RaiseError('Cannot add aggregate function ' + FuncName,'');
+    FDB.RaiseError('Cannot add aggregate function ' + UTF8ToString(FuncName),'');
   end;  
 end;
 
@@ -3082,7 +3209,7 @@ var
   Val: PSQLiteFuncs;
 begin
   New(Val);
-  Val.FuncName := UpperCase(FuncName);
+  Val.FuncName := UpperCase(UTF8ToString(FuncName));
   Val.Funcs := Self;
   Val.AFunc := AFunc;
   Val.AStepFunc := nil;
@@ -3094,7 +3221,7 @@ begin
     Val, @ScalarDefFunc, nil, nil);
   if iRes <> SQLITE_OK then
   begin
-    FDB.RaiseError('Cannot add scalar function ' + FuncName,'');
+    FDB.RaiseError('Cannot add scalar function ' + UTF8ToString(FuncName),'');
   end;
 end;
 

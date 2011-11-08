@@ -7,12 +7,12 @@ procedure Register;
 implementation
 
 uses
-  Classes, SQLite3Dataset;
+  Classes, SQLiteTable3, SQLite3Dataset;
 
 procedure Register;
 begin
   RegisterComponents('SQLite3',
-    [TSQLiteDataset, TSQLiteUpdateSQL]);
+    [TSQLiteDatabase, TSQLiteDataset, TSQLiteUpdateSQL]);
 end;
 
 end.

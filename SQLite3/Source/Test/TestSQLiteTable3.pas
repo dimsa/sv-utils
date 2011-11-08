@@ -14,12 +14,17 @@ interface
 uses
   TestFramework, Windows, SQLite3, Classes, SysUtils, SQLiteTable3, Generics.Collections;
 
+{$HINTS OFF}
+
 type
   // Test methods for class TSQLiteDatabase
 
   TestTSQLiteDatabase = class(TTestCase)
   strict private
     FSQLiteDatabase: TSQLiteDatabase;
+    FWorks: Boolean;
+    procedure TestAuthorize(Sender: TSQLiteDatabase; ActionCode: TSQLiteActionCode;
+      const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer);
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -50,6 +55,7 @@ type
     procedure TestSimpleDataLoad;
     procedure TestEncryptedDB;
     procedure TestChangePassword;
+    procedure TestAuthorizer;
   end;
   // Test methods for class TSQLiteTable
 
@@ -150,6 +156,8 @@ type
   end;
 
 implementation
+
+{$WARNINGS OFF}
 
 procedure TestTSQLiteDatabase.SetUp;
 begin
@@ -657,6 +665,64 @@ begin
     tbl.Free;
     SDB.Free;
   end;
+end;
+
+procedure TestTSQLiteDatabase.TestAuthorize(Sender: TSQLiteDatabase; ActionCode: TSQLiteActionCode;
+  const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer);
+begin
+  AResult := SQLITE_OK;
+  FWorks := True;
+  case ActionCode of
+    SQLITE_CREATE_INDEX: ;
+    SQLITE_CREATE_TABLE: ;
+    SQLITE_CREATE_TEMP_INDEX: ;
+    SQLITE_CREATE_TEMP_TABLE: ;
+    SQLITE_CREATE_TEMP_TRIGGER: ;
+    SQLITE_CREATE_TEMP_VIEW: ;
+    SQLITE_CREATE_TRIGGER: ;
+    SQLITE_CREATE_VIEW: ;
+    SQLITE_DELETE: ;
+    SQLITE_DROP_INDEX: ;
+    SQLITE_DROP_TABLE: ;
+    SQLITE_DROP_TEMP_INDEX: ;
+    SQLITE_DROP_TEMP_TABLE: ;
+    SQLITE_DROP_TEMP_TRIGGER: ;
+    SQLITE_DROP_TEMP_VIEW: ;
+    SQLITE_DROP_TRIGGER: ;
+    SQLITE_DROP_VIEW: ;
+    SQLITE_INSERT: ;
+    SQLITE_PRAGMA: ;
+    SQLITE_READ: ;
+    SQLITE_SELECT: AResult := SQLITE_OK;
+    SQLITE_TRANSACTION: ;
+    SQLITE_UPDATE: ;
+    SQLITE_ATTACH: ;
+    SQLITE_DETACH: ;
+    SQLITE_ALTER_TABLE: ;
+    SQLITE_REINDEX: ;
+    SQLITE_ANALYZE: ;
+    SQLITE_CREATE_VTABLE: ;
+    SQLITE_DROP_VTABLE: ;
+    SQLITE_FUNCTION: ;
+    SQLITE_SAVEPOINT: ;
+    SQLITE_COPY: ;
+  end;
+end;
+
+procedure TestTSQLiteDatabase.TestAuthorizer;
+begin
+  FWorks := False;
+  //add authorize
+  FSQLiteDatabase.OnAuthorize := TestAuthorize;
+
+  CheckTrue(FSQLiteDatabase.TableExists('testtable'));
+  CheckTrue(FWorks);
+  //remove authorize
+  FWorks := False;
+  FSQLiteDatabase.OnAuthorize := nil;
+
+  CheckTrue(FSQLiteDatabase.TableExists('testtable'));
+  CheckFalse(FWorks);
 end;
 
 procedure TestTSQLiteDatabase.TestParamsClear;
@@ -1309,6 +1375,9 @@ begin
 
   Check(ReturnValue);
 end;
+
+{$HINTS ON}
+{$WARNINGS ON}
 
 initialization
   // Register any test cases with the test runner
