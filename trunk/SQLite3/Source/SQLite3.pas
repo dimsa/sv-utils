@@ -181,6 +181,19 @@ var
   sqlite3_rekey: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_rekey
   sqlite3_set_authorizer: function(db: TSQLiteDB; xAuth: TxAuth; pUserData: Pointer): Integer; cdecl; //sqlite3_set_authorizer
   sqlite3_update_hook: procedure(db: TSQLiteDB; UpdHookProc: TxUpdHook; pUserData: Pointer); cdecl; //sqlite3_update_hook
+  sqlite3_table_column_metadata: function(db: TSQLiteDB; zDbName: PAnsiChar; zTableName: PAnsiChar; zColumnName: PAnsiChar;
+    var pzDataType: PAnsiChar; var pzCollSeq: PAnsiChar; var pNotNull: Integer; var pPrimaryKey: Integer; var pAutoinc: Integer): Integer; cdecl;
+ { int sqlite3_table_column_metadata(
+  sqlite3 *db,                /* Connection handle */
+  const char *zDbName,        /* Database name or NULL */
+  const char *zTableName,     /* Table name */
+  const char *zColumnName,    /* Column name */
+  char const **pzDataType,    /* OUTPUT: Declared data type */
+  char const **pzCollSeq,     /* OUTPUT: Collation sequence name */
+  int *pNotNull,              /* OUTPUT: True if NOT NULL constraint exists */
+  int *pPrimaryKey,           /* OUTPUT: True if column part of PK */
+  int *pAutoinc               /* OUTPUT: True if column is auto-increment */
+);     }
 
   SQLite3_ColumnBlob: function(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; // 'sqlite3_column_blob';
   SQLite3_ColumnBytes: function(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; // 'sqlite3_column_bytes';
@@ -544,6 +557,7 @@ begin
       sqlite3_value_type := LoadProc('sqlite3_value_type');
       sqlite3_set_authorizer := LoadProc('sqlite3_set_authorizer');
       sqlite3_update_hook := LoadProc('sqlite3_update_hook');
+      sqlite3_table_column_metadata := LoadProc('sqlite3_table_column_metadata');
 
       sqlite3_key := LoadProcSilent('sqlite3_key');
       sqlite3_rekey := LoadProcSilent('sqlite3_rekey');

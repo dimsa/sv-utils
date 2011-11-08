@@ -59,6 +59,7 @@ type
     procedure TestChangePassword;
     procedure TestAuthorizer;
     procedure TestUpdateHook;
+    procedure TestGetTableColumnMetadata;
   end;
   // Test methods for class TSQLiteTable
 
@@ -105,6 +106,7 @@ type
     procedure TestExecSQL2;
     procedure TestExecSQL3;
     procedure TestExecSQL4;
+    procedure TestUnicodeParams;
     procedure TestPreparedBlobs;
     procedure TestPreparedBlobs2;
     procedure TestPrepareStatement;
@@ -199,6 +201,25 @@ begin
   finally
     ReturnValue.Free;
   end;
+end;
+
+procedure TestTSQLiteDatabase.TestGetTableColumnMetadata;
+var
+  DType, CSeq: AnsiString;
+  isNotNull, isPrimKey, isAutoinc: Boolean;
+begin
+  FSQLiteDatabase.GetTableColumnMetadata('testtable', 'name', DType, CSeq, isNotNull, isPrimKey, isAutoinc);
+
+  CheckTrue(SameText(DType, 'varchar (255)'));
+  CheckFalse(isNotNull);
+  CheckFalse(isAutoinc);
+  CheckFalse(isPrimKey);
+
+  FSQLiteDatabase.GetTableColumnMetadata('testtable', 'ID', DType, CSeq, isNotNull, isPrimKey, isAutoinc);
+  CheckTrue(SameText(DType, 'integer'));
+  CheckFalse(isNotNull);
+  CheckFalse(isAutoinc);
+  CheckTrue(isPrimKey);
 end;
 
 procedure TestTSQLiteDatabase.TestEncryptedDB;
@@ -932,6 +953,31 @@ begin
   FSQLitePreparedStatement.SetParamFloat(3, numb);
 
   Check(FSQLitePreparedStatement.ParamCount = 3);
+end;
+
+procedure TestTSQLitePreparedStatement.TestUnicodeParams;
+var
+  ReturnValue: Boolean;
+  SQL, sData, sDB: string;
+  iId: Int64;
+begin
+  SQL := 'insert into testtable (Name) Values (?)';
+  FSQLitePreparedStatement.ClearParams;
+  FSQLitePreparedStatement.PrepareStatement(SQL);
+  sData :=  'Lietuvių and Русский';
+  ReturnValue := FSQLitePreparedStatement.ExecSQL(SQL, [sData]);
+  CheckTrue(ReturnValue);
+  iId := FSQLiteDatabase.GetLastInsertRowID;
+  SQL := 'select name from testtable where Rowid = ?';
+  FSQLitePreparedStatement.ClearParams;
+  FSQLitePreparedStatement.PrepareStatement(SQL, [iId]);
+  sDB := FSQLitePreparedStatement.ExecQueryIntf.Fields[0].AsString;
+  CheckTrue(AnsiSameStr(sDB, sData));
+
+  SQL := 'delete from testtable where Rowid = ?';
+  FSQLitePreparedStatement.ClearParams;
+  FSQLitePreparedStatement.PrepareStatement(SQL, [iId]);
+  FSQLitePreparedStatement.ExecSQL;
 end;
 
 procedure TestTSQLitePreparedStatement.TestSetParamNull;

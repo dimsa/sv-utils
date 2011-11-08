@@ -57,6 +57,7 @@
    Modified and enhanced by Lukas Gebauer
    Modified and enhanced by Tobias Gunkel
    Modified and enhanced by Linas Naginionis (lnaginionis@gmail.com)
+   New home: http://code.google.com/p/sv-utils/
 }
 
 interface
@@ -111,13 +112,13 @@ type
     valuetype: integer;
     valueinteger: int64;
     valuefloat: double;
-    valuedata: RawByteString;
+    valuedata: string;
     valueptr: Pointer;
     blobsize: Int64;
     constructor Create(); virtual;
   end;
 
-  THookQuery = procedure(Sender: TObject;const SQL: String) of object;
+  THookQuery = procedure(Sender: TObject; const SQL: String) of object;
   TAuthEvent = procedure(Sender: TSQLiteDatabase; ActionCode: TSQLiteActionCode;
     const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer) of object;
   TUpdateHookEvent = procedure(Sender: TSQLiteDatabase; Operation: TSQLiteActionCode;
@@ -254,6 +255,8 @@ type
     function GetTableValue(const SQL: String): int64;
     function GetTableString(const SQL: String): string;
     procedure GetTableStrings(const SQL: String; const Value: TStrings);
+    procedure GetTableColumnMetadata(const TableName, ColumnName: AnsiString; var Datatype, CollSeq: AnsiString;
+      var bNotNull, bPrimKey, bAutoinc: Boolean; const DbName: AnsiString = '');
     function GetPreparedStatement(const SQL: string): TSQLitePreparedStatement; overload;
     {$REGION 'Doc'}
       /// <summary>
@@ -496,6 +499,13 @@ type
     procedure SetSQL(const Value: string);
     function GetParamCount: Integer;
     function GetParams(index: Integer): TSQliteParam;
+  protected
+    procedure SetParamBlobInternal(const Value: TStream; const I: Integer = 0; const Name: string = '');
+    procedure SetParamIntInternal(value: int64; const I: Integer = 0; const name: string = '');
+    procedure SetParamFloatInternal(value: double; const I: Integer = 0; const name: string = '');
+    procedure SetParamTextInternal(const value: string; const I: Integer = 0; const name: string = '');
+    procedure SetParamNullInternal(const I: Integer = 0; const name: string = '');
+    procedure SetParamVariantInternal(const Value: Variant; const I: Integer = 0; const name: string = '');
   public
     constructor Create(DB: TSQLiteDatabase); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
@@ -504,13 +514,13 @@ type
 
     procedure ClearParams;
 
+    procedure SetParamInt(const I: Integer; value: int64); overload;
     procedure SetParamInt(const name: string; value: int64); overload;
+    procedure SetParamFloat(const I: Integer; value: double); overload;
     procedure SetParamFloat(const name: string; value: double); overload;
     procedure SetParamText(const name: string; const value: string); overload;
-    procedure SetParamNull(const name: string); overload;
-    procedure SetParamInt(const I: Integer; value: int64); overload;
-    procedure SetParamFloat(const I: Integer; value: double); overload;
     procedure SetParamText(const I: Integer; const value: string); overload;
+    procedure SetParamNull(const name: string); overload;
     procedure SetParamNull(const I: Integer); overload;
     procedure SetParamDateTime(const I: Integer; const Value: TDateTime); overload;
     procedure SetParamDateTime(const name: string; const Value: TDateTime); overload;
@@ -993,6 +1003,7 @@ var
 begin
   if Assigned(Query.Statement) then
   begin
+    DoQuery(Query.SQL);
     iStepResult := Sqlite3_step(Query.Statement);
 
     if (iStepResult <> SQLITE_DONE) then
@@ -1125,6 +1136,33 @@ end;
 function TSQLiteDatabase.GetTable(const SQL: String): TSQLiteTable;
 begin
   Result := TSQLiteTable.Create(Self, SQL);
+end;
+
+procedure TSQLiteDatabase.GetTableColumnMetadata(const TableName, ColumnName: AnsiString; var Datatype,
+  CollSeq: AnsiString; var bNotNull, bPrimKey, bAutoinc: Boolean; const DbName: AnsiString);
+var
+  ADbName, ADataType, ACollSeq: PAnsiChar;
+  ANotNull, APrimKey, AAutoinc: Integer;
+begin
+  if DbName = '' then
+    ADbName := nil
+  else
+    ADbName := PAnsiChar(DbName);
+
+  ADataType := '';
+  ACollSeq := '';
+
+  if (sqlite3_table_column_metadata(fDB, ADbName, PAnsiChar(TableName), PAnsiChar(ColumnName), ADatatype,
+    ACollSeq, ANotNull, APrimKey, AAutoinc) <> SQLITE_OK) then
+  begin
+    RaiseError(Format('Cannot get table ([%S]) column ([%S]) metadata.', [TableName, ColumnName]), '');
+  end;
+
+  bNotNull := Boolean(ANotNull);
+  bPrimKey := Boolean(APrimKey);
+  bAutoinc := Boolean(AAutoinc);
+  Datatype := ADataType;
+  CollSeq := ACollSeq;
 end;
 
 {$HINTS OFF}
@@ -1425,7 +1463,7 @@ begin
   par := TSQliteParam.Create;
   par.name := name;
   par.valuetype := SQLITE_TEXT;
-  par.valuedata := UTF8Encode(value);
+  par.valuedata := value;
   fParams.Add(par);
 end;
 
@@ -1514,7 +1552,7 @@ begin
           SQLITE_FLOAT:
             sqlite3_bind_double(Stmt, i, par.valuefloat);
           SQLITE_TEXT:
-            sqlite3_bind_text16(Stmt, i, PChar(UTF8ToUnicodeString(par.valuedata)),
+            sqlite3_bind_text16(Stmt, i, PChar(par.valuedata),
               length(par.valuedata), SQLITE_TRANSIENT);
           SQLITE_NULL:
             sqlite3_bind_null(Stmt, i);
@@ -2375,10 +2413,21 @@ procedure TSQLitePreparedStatement.SetParamDate(const I: Integer; const Value: T
 end;
 
 procedure TSQLitePreparedStatement.SetParamBlob(const I: Integer; const Value: TStream);
+begin
+  SetParamBlobInternal(Value, I);
+end;
+
+procedure TSQLitePreparedStatement.SetParamBlob(const name: string; const Value: TStream);
+begin
+  SetParamBlobInternal(Value, 0, name);
+end;
+
+procedure TSQLitePreparedStatement.SetParamBlobInternal(const Value: TStream; const I: Integer; const Name: string);
 var
   par: TSQliteParam;
 begin
   par := TSQliteParam.Create;
+  par.name := name;
   par.index := I;
   par.valuetype := SQLITE_BLOB;
   par.blobsize := Value.Size;
@@ -2392,33 +2441,7 @@ begin
     Value.Position := 0;
     Value.Read(par.valueptr^, par.blobsize);
   end;
-
   fParams.Add(par);
-
-  //par.valueptr := value;
-end;
-
-procedure TSQLitePreparedStatement.SetParamBlob(const name: string; const Value: TStream);
-var
-  par: TSQliteParam;
-begin
-  par := TSQliteParam.Create;
-  par.name := name;
-  par.valuetype := SQLITE_BLOB;
-  par.blobsize := Value.Size;
-  if par.blobsize > 0 then
-  begin
-    GetMem(par.valueptr, par.blobsize);
-    if (par.valueptr = nil) then
-      raise ESqliteException.CreateFmt('Error getting memory to set blob as param',
-        ['', 'Error']);
-
-    Value.Position := 0;
-    Value.Read(par.valueptr^, par.blobsize);
-  end;
-  fParams.Add(par);
-
-// par.valueptr := value;
 end;
 
 procedure TSQLitePreparedStatement.SetParamDate(const name: string; const Value: TDate);
@@ -2432,10 +2455,16 @@ procedure TSQLitePreparedStatement.SetParamDateTime(const name: string; const Va
 end;
 
 procedure TSQLitePreparedStatement.SetParamFloat(const I: Integer; value: double);
-var
+begin
+  SetParamFloatInternal(value, I);
+end;
+
+procedure TSQLitePreparedStatement.SetParamFloatInternal(value: double; const I: Integer; const name: string);
+var
   par: TSQliteParam;
 begin
   par := TSQliteParam.Create;
+  par.name := name;
   par.index := I;
   par.valuetype := SQLITE_FLOAT;
   fParams.Add(par);
@@ -2444,34 +2473,26 @@ begin
 end;
 
 procedure TSQLitePreparedStatement.SetParamFloat(const name: string; value: double);
-var
-  par: TSQliteParam;
 begin
-  par := TSQliteParam.Create;
-  par.name := name;
-  par.valuetype := SQLITE_FLOAT;
-  fParams.Add(par);
-
-  par.valuefloat := value;
+  SetParamFloatInternal(value, 0, name);
 end;
 
 procedure TSQLitePreparedStatement.SetParamInt(const name: string; value: int64);
+begin
+  SetParamIntInternal(value, 0, name);
+end;
+
+procedure TSQLitePreparedStatement.SetParamInt(const I: Integer; value: int64);
+begin
+  SetParamIntInternal(value, I);
+end;
+
+procedure TSQLitePreparedStatement.SetParamIntInternal(value: int64; const I: Integer; const name: string);
 var
   par: TSQliteParam;
 begin
   par := TSQliteParam.Create;
   par.name := name;
-  par.valuetype := SQLITE_INTEGER;
-  fParams.Add(par);
-
-  par.valueinteger := value;
-end;
-
-procedure TSQLitePreparedStatement.SetParamInt(const I: Integer; value: int64);
-var
-  par: TSQliteParam;
-begin
-  par := TSQliteParam.Create;
   par.index := I;
   par.valuetype := SQLITE_INTEGER;
   fParams.Add(par);
@@ -2480,11 +2501,22 @@ begin
 end;
 
 procedure TSQLitePreparedStatement.SetParamNull(const I: Integer);
+begin
+  SetParamNullInternal(I);
+end;
+
+procedure TSQLitePreparedStatement.SetParamNull(const name: string);
+begin
+  SetParamNullInternal(0, name);
+end;
+
+procedure TSQLitePreparedStatement.SetParamNullInternal(const I: Integer; const name: string);
 var
   par: TSQliteParam;
 begin
   par := TSQliteParam.Create;
   par.index := I;
+  par.name := name;
   par.valuetype := SQLITE_NULL;
   fParams.Add(par);
 end;
@@ -2571,91 +2603,40 @@ begin
   BindParams;
 end;
 
-procedure TSQLitePreparedStatement.SetParamNull(const name: string);
-var
-  par: TSQliteParam;
-begin
-  par := TSQliteParam.Create;
-  par.name := name;
-  par.valuetype := SQLITE_NULL;
-  fParams.Add(par);
-end;
-
 procedure TSQLitePreparedStatement.SetParamText(const name, value: string);
-var
-  par: TSQliteParam;
 begin
-  par := TSQliteParam.Create;
-  par.name := name;
-  par.valuetype := SQLITE_TEXT;
-  fParams.Add(par);
-  par.valuedata := utf8Encode(value);
+  SetParamTextInternal(value, 0, name);
 end;
 
 procedure TSQLitePreparedStatement.SetParamText(const I: Integer; const value: string);
+begin
+  SetParamTextInternal(value, I);
+end;
+
+procedure TSQLitePreparedStatement.SetParamTextInternal(const value: string; const I: Integer; const name: string);
 var
   par: TSQliteParam;
 begin
   par := TSQliteParam.Create;
   par.index := I;
+  par.name := name;
   par.valuetype := SQLITE_TEXT;
   fParams.Add(par);
 
-  par.valuedata := utf8Encode(value);
+  par.valuedata := value;
 end;
 
 procedure TSQLitePreparedStatement.SetParamVariant(const I: Integer; const Value: Variant);
-var
-  vType: TVarType;
-  bStream: TMemoryStream;
-  ptr: Pointer;
-  iDim: Integer;
 begin
-  vType := VarType(Value);
-  case vType of
-    varInteger, varSmallint, varByte, varInt64, varUInt64, varWord, varLongWord, varShortInt,
-    varBoolean:
-    begin
-      SetParamInt(I, Value);
-    end;
-    varString, varUString, varOleStr:
-    begin
-      SetParamText(I, Value);
-    end;
-    varSingle, varDouble, varCurrency:
-    begin
-      SetParamFloat(I, Value);
-    end;
-    varDate:
-    begin
-      SetParamDateTime(I, Value);
-    end;
-    varNull, varEmpty:
-    begin
-      SetParamNull(I);
-    end
-    else
-    begin
-      if VarIsArray(Value) then
-      begin
-        //blob type
-        bStream := TMemoryStream.Create();
-        iDim := VarArrayDimCount(Value);
-        ptr := VarArrayLock(Value);
-        try
-          bStream.WriteBuffer(ptr^, VarArrayHighBound(Value, iDim));
-
-          SetParamBlob(I, bStream);
-        finally
-          VarArrayUnlock(Value);
-          bStream.Free;
-        end;
-      end;
-    end;
-  end;
+  SetParamVariantInternal(Value, I);
 end;
 
 procedure TSQLitePreparedStatement.SetParamVariant(const name: string; const Value: Variant);
+begin
+  SetParamVariantInternal(Value, 0, name);
+end;
+
+procedure TSQLitePreparedStatement.SetParamVariantInternal(const Value: Variant; const I: Integer; const name: string);
 var
   vType: TVarType;
   bStream: TMemoryStream;
@@ -2667,23 +2648,23 @@ begin
     varInteger, varSmallint, varByte, varInt64, varUInt64, varWord, varLongWord, varShortInt,
     varBoolean:
     begin
-      SetParamInt(name, Value);
+      SetParamIntInternal(Value, I, name);
     end;
     varString, varUString, varOleStr:
     begin
-      SetParamText(name, Value);
+      SetParamTextInternal(Value, I, name);
     end;
     varSingle, varDouble, varCurrency:
     begin
-      SetParamFloat(name, Value);
+      SetParamFloatInternal(Value, I, name);
     end;
     varDate:
     begin
-      SetParamDateTime(name, Value);
+      SetParamTextInternal(DateTimeToStr(Value, FDB.FmtSett), I, name);
     end;
     varNull, varEmpty:
     begin
-      SetParamNull(name);
+      SetParamNullInternal(I, name);
     end
     else
     begin
@@ -2696,7 +2677,7 @@ begin
         try
           bStream.WriteBuffer(ptr^, VarArrayHighBound(Value, iDim));
 
-          SetParamBlob(name, bStream);
+          SetParamBlobInternal(bStream, I, name);
         finally
           VarArrayUnlock(Value);
           bStream.Free;
@@ -2704,6 +2685,7 @@ begin
       end;
     end;
   end;
+
 end;
 
 procedure TSQLitePreparedStatement.SetSQL(const Value: string);
@@ -3012,6 +2994,7 @@ begin
       FDB.RaiseError('Could not prepare SQL statement', FSQL);
  // end;
  // BindParams;
+  DB.DoQuery(SQL);
 end;
 
 function TSQLitePreparedStatement.BindParameterCount: Integer;
@@ -3061,13 +3044,13 @@ begin
             sqlite3_bind_double(fStmt, i, par.valuefloat);
           SQLITE_TEXT:
           begin
-            sqlite3_bind_text(fStmt, i, PAnsiChar(par.valuedata),
-              -1, SQLITE_TRANSIENT);
+           // sqlite3_bind_text(fStmt, i, PAnsiChar(par.valuedata),
+           //   -1, SQLITE_TRANSIENT);
             // sqlite3_bind_text16 not working, don't know why
             //I guess it was incorrectly specified sqlite function name, corrected now
             //but our old method works ok so we don't change it now
-           // sqlite3_bind_text16(fStmt, i, PChar(par.valuedata),
-           //   -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text16(fStmt, i, PChar(par.valuedata),
+              -1, SQLITE_TRANSIENT);
           end;
           SQLITE_BLOB:
           begin
