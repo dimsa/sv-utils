@@ -131,6 +131,9 @@ type
   TxFunc = procedure(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: Psqlite3_value);
   TxStep = procedure(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: Psqlite3_value);
   TxAuth = function(pUserData: Pointer; ActionCode: Integer; Det1, Det2, Det3, Det4: PAnsiChar): Integer;
+  {void(*)(void *,int ,char const *,char const *,sqlite3_int64),}
+  TxUpdHook = procedure(pUserData: Pointer; Operation: Integer; DbName: PAnsiChar;
+    TableName: PAnsiChar; ARowID: Int64);
 
   PPAnsiCharArray = ^TPCharArray;
   TPAnsiCharArray = array[0 .. (MaxInt div SizeOf(PAnsiChar))-1] of PAnsiChar;
@@ -177,6 +180,7 @@ var
   sqlite3_key: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_key
   sqlite3_rekey: function(db: TSQLiteDB; Key: PAnsiChar; Len: Integer): Integer; cdecl; //sqlite3_rekey
   sqlite3_set_authorizer: function(db: TSQLiteDB; xAuth: TxAuth; pUserData: Pointer): Integer; cdecl; //sqlite3_set_authorizer
+  sqlite3_update_hook: procedure(db: TSQLiteDB; UpdHookProc: TxUpdHook; pUserData: Pointer); cdecl; //sqlite3_update_hook
 
   SQLite3_ColumnBlob: function(hStmt: TSqliteStmt; ColNum: integer): pointer; cdecl; // 'sqlite3_column_blob';
   SQLite3_ColumnBytes: function(hStmt: TSqliteStmt; ColNum: integer): integer; cdecl; // 'sqlite3_column_bytes';
@@ -539,6 +543,7 @@ begin
       sqlite3_value_text16le := LoadProc('sqlite3_value_text16le');
       sqlite3_value_type := LoadProc('sqlite3_value_type');
       sqlite3_set_authorizer := LoadProc('sqlite3_set_authorizer');
+      sqlite3_update_hook := LoadProc('sqlite3_update_hook');
 
       sqlite3_key := LoadProcSilent('sqlite3_key');
       sqlite3_rekey := LoadProcSilent('sqlite3_rekey');

@@ -25,6 +25,8 @@ type
     FWorks: Boolean;
     procedure TestAuthorize(Sender: TSQLiteDatabase; ActionCode: TSQLiteActionCode;
       const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer);
+    procedure TestDoUpdateHook(Sender: TSQLiteDatabase; Operation: TSQLiteActionCode;
+   const ADatabase, ATable: String; ARowID: Int64);
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -56,6 +58,7 @@ type
     procedure TestEncryptedDB;
     procedure TestChangePassword;
     procedure TestAuthorizer;
+    procedure TestUpdateHook;
   end;
   // Test methods for class TSQLiteTable
 
@@ -480,6 +483,23 @@ begin
   end;
 end;
 
+procedure TestTSQLiteDatabase.TestUpdateHook;
+begin
+  FWorks := False;
+  FSQLiteDatabase.OnUpdate := TestDoUpdateHook;
+
+  FSQLiteDatabase.ExecSQL('update testtable set OtherID = 10 where ID = 100;');
+
+  CheckTrue(FWorks);
+
+  FWorks := False;
+
+  FSQLiteDatabase.OnUpdate := nil;
+
+  FSQLiteDatabase.ExecSQL('update testtable set OtherID = 10 where ID = 101;');
+  CheckFalse(FWorks);
+end;
+
 procedure TestTSQLiteDatabase.TestChangePassword;
 var
   DB, DB2: TSQLiteDatabase;
@@ -542,6 +562,12 @@ begin
   iVal := FSQLiteDatabase.GetTableValue('select OtherID from testtable where ID = 10');
 
   Check(iVal = iTest);
+end;
+
+procedure TestTSQLiteDatabase.TestDoUpdateHook(Sender: TSQLiteDatabase;
+  Operation: TSQLiteActionCode; const ADatabase, ATable: String; ARowID: Int64);
+begin
+  FWorks := True;
 end;
 
 procedure TestTSQLiteDatabase.TestRollback;
@@ -671,6 +697,7 @@ procedure TestTSQLiteDatabase.TestAuthorize(Sender: TSQLiteDatabase; ActionCode:
   const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer);
 begin
   AResult := SQLITE_OK;
+  //AResult could be of: SQLITE_OK, SQLITE_DENY, SQLITE_IGNORE
   FWorks := True;
   case ActionCode of
     SQLITE_CREATE_INDEX: ;
