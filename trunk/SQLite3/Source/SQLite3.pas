@@ -62,6 +62,10 @@ const
   SQLITE_ROW         = 100; // sqlite3_step() has another row ready
   SQLITE_DONE        = 101; // sqlite3_step() has finished executing
 
+  {authorizer returns}
+  SQLITE_DENY  = 1;
+  SQLITE_IGNORE = 2;
+
   SQLITE_INTEGER = 1;
   SQLITE_FLOAT   = 2;
   SQLITE_TEXT    = 3;
