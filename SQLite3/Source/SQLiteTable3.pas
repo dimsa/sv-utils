@@ -128,8 +128,6 @@ type
 
   TSQLiteUserFunc = reference to procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar);
   TSQLiteUserFuncFinal = reference to procedure(sqlite3_context: Psqlite3_context);
-//  TSQLiteAuthFunc = reference to function(DB: TSQLiteDatabase; ActionCode: Integer;
-//    const AArg1, AArg2, AArg3, AArg4: String): Integer;
 
   TSQLiteFuncType = (sftScalar, sftAggregate);
 
@@ -192,6 +190,7 @@ type
     FConnected: Boolean;
     FOnAuthorize: TAuthEvent;
     FOnAfterOpen: TNotifyEvent;
+    FOnAfterClose: TNotifyEvent;
     procedure RaiseError(const s: string; const SQL: string);
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
@@ -355,8 +354,13 @@ type
     property Synchronised: boolean read FSync write SetSynchronised default False;
 
     //events
+    property OnAfterClose: TNotifyEvent read FOnAfterClose write FOnAfterClose;
     property OnAfterOpen: TNotifyEvent read FOnAfterOpen write FOnAfterOpen;
     property OnQuery: THookQuery read FOnQuery write FOnQuery;
+    /// <summary>
+    /// Assign authorization callback.
+    /// AResult should return one of the values: SQLITE_OK, SQLITE_DENY, SQLITE_IGNORE.
+    /// </summary>
     property OnAuthorize: TAuthEvent read FOnAuthorize write SetOnAuthorize;
   end;
 
@@ -842,6 +846,7 @@ begin
   self.fInTrans := False;
   FEncoding := DefaultEncoding;
   FOnAfterOpen := nil;
+  FOnAfterClose := nil;
   Open(Password);
 end;
 
@@ -1274,6 +1279,9 @@ begin
   if Assigned(fDB) then
     SQLite3_Close(fDB);
   ParamsClear;
+
+  if Assigned(FOnAfterClose) then
+    FOnAfterClose(Self);
 end;
 
 procedure TSQLiteDatabase.Commit;
