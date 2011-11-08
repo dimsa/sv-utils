@@ -120,6 +120,9 @@ type
   THookQuery = procedure(Sender: TObject;const SQL: String) of object;
   TAuthEvent = procedure(Sender: TSQLiteDatabase; ActionCode: TSQLiteActionCode;
     const AArg1, AArg2, AArg3, AArg4: String; var AResult: Integer) of object;
+  TUpdateHookEvent = procedure(Sender: TSQLiteDatabase; Operation: TSQLiteActionCode;
+   const ADatabase, ATable: String; ARowID: Int64) of object;
+
 
   TSQLiteQuery = record
     SQL: String;
@@ -191,6 +194,7 @@ type
     FOnAuthorize: TAuthEvent;
     FOnAfterOpen: TNotifyEvent;
     FOnAfterClose: TNotifyEvent;
+    FOnUpdate: TUpdateHookEvent;
     procedure RaiseError(const s: string; const SQL: string);
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
@@ -200,6 +204,8 @@ type
     procedure SetConnected(const Value: Boolean);
 
     procedure SetOnAuthorize(const Value: TAuthEvent);
+
+    procedure SetOnUpdate(const Value: TUpdateHookEvent);
   protected
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
@@ -362,6 +368,7 @@ type
     /// AResult should return one of the values: SQLITE_OK, SQLITE_DENY, SQLITE_IGNORE.
     /// </summary>
     property OnAuthorize: TAuthEvent read FOnAuthorize write SetOnAuthorize;
+    property OnUpdate: TUpdateHookEvent read FOnUpdate write SetOnUpdate;
   end;
 
   /// <summary>
@@ -804,6 +811,21 @@ begin
   end;
 end;
 
+procedure DoUpdateHook(pUserData: Pointer; Operation: Integer; DbName: PAnsiChar;
+    TableName: PAnsiChar; ARowID: Int64); cdecl;
+var
+  DB: TSQLiteDatabase;
+begin
+  DB := TSQLiteDatabase(pUserData);
+  if Assigned(DB.FOnUpdate) then
+  begin
+    DB.FOnUpdate(DB, TSQLiteActionCode(Operation), UTF8ToString(DbName), UTF8ToString(TableName),
+      ARowID);
+  end;
+end;
+
+
+
 
 {$IFDEF WIN32}
 function SystemCollate(Userdta: pointer; Buf1Len: integer; Buf1: pointer;
@@ -847,6 +869,7 @@ begin
   FEncoding := DefaultEncoding;
   FOnAfterOpen := nil;
   FOnAfterClose := nil;
+  FOnUpdate := nil;
   Open(Password);
 end;
 
@@ -1451,6 +1474,20 @@ begin
   else
   begin
     sqlite3_set_authorizer(fDB, nil, nil);
+  end;
+end;
+
+procedure TSQLiteDatabase.SetOnUpdate(const Value: TUpdateHookEvent);
+begin
+  FOnUpdate := Value;
+
+  if Assigned(FOnUpdate) then
+  begin
+    sqlite3_update_hook(fDB, @DoUpdateHook, Self);
+  end
+  else
+  begin
+    sqlite3_update_hook(fDB, nil, nil);
   end;
 end;
 
