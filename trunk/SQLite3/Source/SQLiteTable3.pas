@@ -196,7 +196,10 @@ type
     FOnAfterOpen: TNotifyEvent;
     FOnAfterClose: TNotifyEvent;
     FOnUpdate: TUpdateHookEvent;
-    procedure RaiseError(const s: string; const SQL: string);
+    FExtEnabled: Boolean;
+    FReadUncommitted: Boolean;
+    procedure RaiseError(const s: string; const SQL: string); overload;
+    procedure RaiseError(const s: string); overload;
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
     class procedure InitDefaultColumnTypes;
@@ -207,6 +210,10 @@ type
     procedure SetOnAuthorize(const Value: TAuthEvent);
 
     procedure SetOnUpdate(const Value: TUpdateHookEvent);
+
+    procedure SetExtEnabled(const Value: Boolean);
+
+    procedure SetReadUncommitted(const Value: Boolean);
   protected
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
@@ -225,6 +232,10 @@ type
       const Password: AnsiString = ''; AOwner: TComponent = nil); reintroduce; overload;
     constructor Create(AOwner: TComponent); reintroduce; overload;
     destructor Destroy; override;
+    //service methods
+    procedure Analyze;
+    procedure Reindex;
+    procedure Vacuum;
     {$REGION 'Doc'}
        /// <summary>
        /// Adds new supported column type
@@ -311,7 +322,7 @@ type
     /// <returns>Memory used in bytes</returns>
     function GetMemoryUsed: Int64;
     /// <summary>
-    /// Change password for encrypted database
+    /// Change password for encrypted database. Empty password decrypts database.
     /// </summary>
     /// <param name="NewPassword">New password: Ansistring</param>
     procedure ChangePassword(const NewPassword: AnsiString);
@@ -327,6 +338,7 @@ type
     function Backup(TargetDB: TSQLiteDatabase): integer; Overload;
     function Backup(TargetDB: TSQLiteDatabase; const targetName: String; const sourceName: String): integer; Overload;
     function Version: string;
+    procedure LoadExtension(const AFilename: string);
     procedure AddCustomCollate(const name: string; xCompare: TCollateXCompare);
     //adds collate named SYSTEM for correct data sorting by user's locale
     Procedure AddSystemCollate;
@@ -357,10 +369,13 @@ type
     property Connected: Boolean read FConnected write SetConnected default False;
     property IsTransactionOpen: Boolean read fInTrans;
     property Encoding: TSQLiteDBEncoding read FEncoding write FEncoding default seUTF8;
+    property ExtensionsEnabled: Boolean read FExtEnabled write SetExtEnabled default False;
     property Functions: TSQLiteFunctions read FFunctions;
+    property ReadUncommitted: Boolean read FReadUncommitted write SetReadUncommitted default False;
     //database rows that were changed (or inserted or deleted) by the most recent SQL statement
     property RowsChanged : integer read getRowsChanged;
     property Synchronised: boolean read FSync write SetSynchronised default False;
+
 
     //events
     property OnAfterClose: TNotifyEvent read FOnAfterClose write FOnAfterClose;
@@ -942,7 +957,6 @@ var
   Msg: PAnsiChar;
   ret : integer;
 begin
-
   Msg := nil;
   ret := SQLite3_ErrCode(fDB);
 
@@ -954,7 +968,24 @@ begin
     [ret, SQLiteErrorStr(ret),SQL, Msg])
   else
     raise ESqliteException.CreateFmt(s, [SQL, 'No message']);
+end;
 
+procedure TSQLiteDatabase.RaiseError(const s: string);
+var
+  Msg: PAnsiChar;
+  ret : integer;
+begin
+  Msg := nil;
+  ret := SQLite3_ErrCode(fDB);
+
+  if ret <> SQLITE_OK then
+    Msg := sqlite3_errmsg(fDB);
+
+  if Msg <> nil then
+    raise ESqliteException.CreateFmt(s +'.'#13'Error [%d]: %s.'#13'%s',
+      [ret, SQLiteErrorStr(ret), Msg])
+  else
+    raise ESqliteException.Create(s);
 end;
 
 procedure TSQLiteDatabase.SetSynchronised(Value: boolean);
@@ -966,6 +997,22 @@ begin
     else
       ExecSQL('PRAGMA synchronous = OFF;');
     fSync := Value;
+  end;
+end;
+
+procedure TSQLiteDatabase.SetReadUncommitted(const Value: Boolean);
+var
+  sVal: string;
+begin
+  if Value <> FReadUncommitted then
+  begin
+    if Value then
+      sVal := 'True'
+    else
+      sVal := 'False';
+
+    ExecSQL(Format('PRAGMA read_uncommitted = %S',[sVal]));
+    FReadUncommitted := Value;
   end;
 end;
 
@@ -1057,6 +1104,12 @@ end;
 {$WARNINGS ON}
 
 {$WARNINGS OFF}
+
+procedure TSQLiteDatabase.Reindex;
+begin
+  ExecSQL('REINDEX');
+end;
+
 procedure TSQLiteDatabase.ReleaseSQL(Query: TSQLiteQuery);
 begin
   if Assigned(Query.Statement) then
@@ -1193,6 +1246,16 @@ begin
   end;
 end;
 
+procedure TSQLiteDatabase.LoadExtension(const AFilename: string);
+var
+  zErr: PAnsiChar;
+begin
+  if (sqlite3_load_extension(fDB, PAnsiChar(UTF8Encode(AFilename)), '0', zErr) <> SQLITE_OK) then
+  begin
+    RaiseError('Cannot load extension: ' + AFilename);
+  end;
+end;
+
 procedure TSQLiteDatabase.Open(const Password: AnsiString);
 var
   Msg: PAnsiChar;
@@ -1321,10 +1384,24 @@ begin
 end;
 
 procedure TSQLiteDatabase.ChangePassword(const NewPassword: AnsiString);
+var
+  pNewPass: PAnsiChar;
+  iLen: Integer;
 begin
   if Assigned(sqlite3_rekey) then
   begin
-    if (sqlite3_rekey(fDB, PAnsiChar(NewPassword), Length(NewPassword)) <> SQLITE_OK) then
+    if NewPassword = '' then
+    begin
+      pNewPass := nil;
+      iLen := 0;
+    end
+    else
+    begin
+      pNewPass := PAnsiChar(NewPassword);
+      iLen := Length(NewPassword);
+    end;
+
+    if (sqlite3_rekey(fDB, pNewPass, iLen) <> SQLITE_OK) then
     begin
       RaiseError('Cannot change database password', '');
     end;
@@ -1380,6 +1457,11 @@ begin
   SQLite3_BusyTimeout(self.fDB, Value);
 end;
 
+procedure TSQLiteDatabase.Vacuum;
+begin
+  ExecSQL('VACUUM');
+end;
+
 function TSQLiteDatabase.Version: string;
 begin
   Result := UTF8ToString(SQLite3_Version);
@@ -1396,6 +1478,11 @@ begin
   {$IFDEF WIN32}
   sqlite3_create_collation16(fdb, 'SYSTEM', SQLITE_UTF16LE, nil, @SystemCollate);
   {$ENDIF}
+end;
+
+procedure TSQLiteDatabase.Analyze;
+begin
+  ExecSQL('ANALYZE');
 end;
 
 {$HINTS OFF}
@@ -1490,6 +1577,16 @@ begin
     FConnected := Value;
   end;
 
+end;
+
+procedure TSQLiteDatabase.SetExtEnabled(const Value: Boolean);
+begin
+  if Value <> FExtEnabled then
+  begin
+    sqlite3_enable_load_extension(fDB, Integer(Value));
+
+    FExtEnabled := Value;
+  end;
 end;
 
 procedure TSQLiteDatabase.SetFilename(const Value: string);

@@ -60,6 +60,7 @@ type
     procedure TestAuthorizer;
     procedure TestUpdateHook;
     procedure TestGetTableColumnMetadata;
+    procedure TestSetExtEnabled;
   end;
   // Test methods for class TSQLiteTable
 
@@ -605,6 +606,13 @@ begin
   iVal := FSQLiteDatabase.GetTableValue('select OtherID from testtable where ID = 10');
 
   Check(iVal <> iTest);
+end;
+
+procedure TestTSQLiteDatabase.TestSetExtEnabled;
+begin
+  FSQLiteDatabase.ExtensionsEnabled := True;
+
+  CheckTrue(FSQLiteDatabase.ExtensionsEnabled);
 end;
 
 procedure TestTSQLiteDatabase.TestSimpleDataLoad;
