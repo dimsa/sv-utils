@@ -188,7 +188,7 @@ type
     fParams: TList;
     FOnQuery: THookQuery;
     FFormatSett: TFormatSettings;
-    FFilename: string;
+    FFilename: TFileName;
     FFunctions: TSQLiteFunctions;
     FEncoding: TSQLiteDBEncoding;
     FConnected: Boolean;
@@ -203,7 +203,7 @@ type
     procedure SetParams(Stmt: TSQLiteStmt);
     function GetRowsChanged: integer;
     class procedure InitDefaultColumnTypes;
-    procedure SetFilename(const Value: string);
+    procedure SetFilename(const Value: TFileName);
 
     procedure SetConnected(const Value: Boolean);
 
@@ -217,6 +217,7 @@ type
   protected
     procedure SetSynchronised(Value: boolean);
     procedure DoQuery(const value: string);
+    procedure SetEvents();
   public
     {$REGION 'Doc'}
       /// <summary>
@@ -357,10 +358,6 @@ type
     {$ENDREGION}
     function Attach(const DBFilename: string; const AttachedDBName: string): Boolean;
     /// <summary>
-    /// Database filename. Opens the database when filename is being set
-    /// </summary>
-    property Filename: string read FFilename write SetFilename;
-    /// <summary>
     /// Format settings to use for DateTime fields
     /// </summary>
     property FmtSett: TFormatSettings read FFormatSett;
@@ -370,6 +367,10 @@ type
     property IsTransactionOpen: Boolean read fInTrans;
     property Encoding: TSQLiteDBEncoding read FEncoding write FEncoding default seUTF8;
     property ExtensionsEnabled: Boolean read FExtEnabled write SetExtEnabled default False;
+    /// <summary>
+    /// Database filename. Opens the database when filename is being set
+    /// </summary>
+    property Filename: TFileName read FFilename write SetFilename;
     property Functions: TSQLiteFunctions read FFunctions;
     property ReadUncommitted: Boolean read FReadUncommitted write SetReadUncommitted default False;
     //database rows that were changed (or inserted or deleted) by the most recent SQL statement
@@ -883,6 +884,7 @@ constructor TSQLiteDatabase.Create(const AFileName: string; DefaultEncoding: TSQ
 begin
   inherited Create(AOwner);
   FOnAuthorize := nil;
+  fDB := nil;
   fParams := TList.Create;
   FFilename := AFileName;
   FFormatSett := TFormatSettings.Create();
@@ -895,20 +897,24 @@ begin
   FOnAfterOpen := nil;
   FOnAfterClose := nil;
   FOnUpdate := nil;
-  Open(Password);
+  FConnected := False;
+  if FFilename <> '' then
+    Open(Password);
 end;
 
 constructor TSQLiteDatabase.Create(AOwner: TComponent);
 begin
+  //inherited Create(AOwner);
   Create('');
 end;
 
 destructor TSQLiteDatabase.Destroy;
 begin
-  Close;
+  if FConnected then
+    Close;
   fParams.Free;
   FFunctions.Free;
-  inherited;
+  inherited Destroy;
 end;
 
 function TSQLiteDatabase.GetLastInsertRowID: int64;
@@ -992,11 +998,14 @@ procedure TSQLiteDatabase.SetSynchronised(Value: boolean);
 begin
   if Value <> fSync then
   begin
-    if Value then
-      ExecSQL('PRAGMA synchronous = ON;')
-    else
-      ExecSQL('PRAGMA synchronous = OFF;');
-    fSync := Value;
+    if FConnected then
+    begin
+      if Value then
+        ExecSQL('PRAGMA synchronous = ON;')
+      else
+        ExecSQL('PRAGMA synchronous = OFF;');
+      fSync := Value;
+    end;
   end;
 end;
 
@@ -1006,13 +1015,16 @@ var
 begin
   if Value <> FReadUncommitted then
   begin
-    if Value then
-      sVal := 'True'
-    else
-      sVal := 'False';
+    if FConnected then
+    begin
+      if Value then
+        sVal := 'True'
+      else
+        sVal := 'False';
 
-    ExecSQL(Format('PRAGMA read_uncommitted = %S',[sVal]));
-    FReadUncommitted := Value;
+      ExecSQL(Format('PRAGMA read_uncommitted = %S',[sVal]));
+      FReadUncommitted := Value;
+    end;
   end;
 end;
 
@@ -1262,6 +1274,7 @@ var
   iResult: Integer;
 begin
   Msg := nil;
+  FConnected := False;
   try
     iResult := SQLITE_OK;
 
@@ -1299,6 +1312,7 @@ begin
       end;
     end;
 
+    FConnected := True;
 //set a few configs
 //L.G. Do not call it here. Because busy handler is not setted here,
 // any share violation causing exception!
@@ -1416,9 +1430,10 @@ procedure TSQLiteDatabase.Close;
 begin
   if self.fInTrans then
     self.Rollback;  //assume rollback
+  ParamsClear;
   if Assigned(fDB) then
     SQLite3_Close(fDB);
-  ParamsClear;
+  FConnected := False;
 
   if Assigned(FOnAfterClose) then
     FOnAfterClose(Self);
@@ -1504,9 +1519,13 @@ procedure TSQLiteDatabase.ParamsClear;
 var
   n: integer;
 begin
-  for n := fParams.Count - 1 downto 0 do
-    TSQliteParam(fparams[n]).free;
-  fParams.Clear;
+  if Assigned(fParams) then
+  begin
+    for n := fParams.Count - 1 downto 0 do
+      TSQliteParam(fParams[n]).Free;
+
+    fParams.Clear;
+  end;
 end;
 
 procedure TSQLiteDatabase.AddParamInt(const name: string; value: int64);
@@ -1572,33 +1591,41 @@ begin
       Close;
 
     if Value then
+    begin
       Open;
+      //set callback events
+      SetEvents;
+    end;
 
     FConnected := Value;
   end;
 
 end;
 
+procedure TSQLiteDatabase.SetEvents;
+begin
+  SetOnAuthorize(FOnAuthorize);
+  SetOnUpdate(FOnUpdate);
+end;
+
 procedure TSQLiteDatabase.SetExtEnabled(const Value: Boolean);
 begin
   if Value <> FExtEnabled then
   begin
-    sqlite3_enable_load_extension(fDB, Integer(Value));
+    if FConnected then
+    begin
+      sqlite3_enable_load_extension(fDB, Integer(Value));
 
-    FExtEnabled := Value;
+      FExtEnabled := Value;
+    end;
   end;
 end;
 
-procedure TSQLiteDatabase.SetFilename(const Value: string);
+procedure TSQLiteDatabase.SetFilename(const Value: TFileName);
 begin
   if (Value <> FFilename) then
   begin
     FFilename := Value;
-
-    if FConnected then
-      Close;
-
-    Open;
   end;
 end;
 
@@ -1606,13 +1633,16 @@ procedure TSQLiteDatabase.SetOnAuthorize(const Value: TAuthEvent);
 begin
   FOnAuthorize := Value;
 
-  if Assigned(FOnAuthorize) then
+  if FConnected then
   begin
-    sqlite3_set_authorizer(fDB, @DoAuthorize, Self);
-  end
-  else
-  begin
-    sqlite3_set_authorizer(fDB, nil, nil);
+    if Assigned(FOnAuthorize) then
+    begin
+      sqlite3_set_authorizer(fDB, @DoAuthorize, Self);
+    end
+    else
+    begin
+      sqlite3_set_authorizer(fDB, nil, nil);
+    end;
   end;
 end;
 
@@ -1620,13 +1650,16 @@ procedure TSQLiteDatabase.SetOnUpdate(const Value: TUpdateHookEvent);
 begin
   FOnUpdate := Value;
 
-  if Assigned(FOnUpdate) then
+  if FConnected then
   begin
-    sqlite3_update_hook(fDB, @DoUpdateHook, Self);
-  end
-  else
-  begin
-    sqlite3_update_hook(fDB, nil, nil);
+    if Assigned(FOnUpdate) then
+    begin
+      sqlite3_update_hook(fDB, @DoUpdateHook, Self);
+    end
+    else
+    begin
+      sqlite3_update_hook(fDB, nil, nil);
+    end;
   end;
 end;
 
@@ -1664,7 +1697,9 @@ end;
 //database rows that were changed (or inserted or deleted) by the most recent SQL statement
 function TSQLiteDatabase.GetRowsChanged: integer;
 begin
-  Result := SQLite3_Changes(self.fDB);
+  Result := 0;
+  if FConnected then
+    Result := SQLite3_Changes(self.fDB);
 end;
 
 procedure TSQLiteDatabase.DoQuery(const value: string);

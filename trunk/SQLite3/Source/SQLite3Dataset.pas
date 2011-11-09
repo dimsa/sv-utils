@@ -79,6 +79,7 @@ type
     procedure DoInternalRefreshRecord(); virtual;
     procedure SetActive(Value: Boolean); override;
     procedure GetPair(Astmt: TSQLitePreparedStatement; AList: TList<T3<string, Boolean, TField>>);
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -158,6 +159,18 @@ begin
     begin
       raise ESQLiteException.Create(Format('Fieldname %S does not exist', []));
     end;
+  end;
+end;
+
+procedure TSQLiteDataset.Notification(AComponent: TComponent; Operation: TOperation);
+begin
+  inherited Notification(AComponent, Operation);
+  if (Operation = opRemove) then
+  begin
+    if AComponent = Database then
+      Database := nil
+    else if AComponent = UpdateSQL then
+      UpdateSQL := nil;
   end;
 end;
 
@@ -401,9 +414,9 @@ begin
   DisableControls;
   FIniting := True;
   try
-    for i := 1 to ParamCount do
+    for i := 1 to Self.Params.Count do
     begin
-      AStmt.SetParamVariant(i, Params[i-1].Value);
+      AStmt.SetParamVariant(i, Self.Params[i-1].Value);
     end;
 
     Result := AStmt.ExecQuery;
