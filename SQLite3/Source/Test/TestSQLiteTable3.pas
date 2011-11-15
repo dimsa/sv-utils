@@ -61,6 +61,7 @@ type
     procedure TestUpdateHook;
     procedure TestGetTableColumnMetadata;
     procedure TestSetExtEnabled;
+    procedure TestGetVersion;
   end;
   // Test methods for class TSQLiteTable
 
@@ -119,6 +120,8 @@ type
   strict private
     FSQLiteDatabase: TSQLiteDatabase;
     FSQLiteField: TSQLiteField;
+    FDst: TSQLiteUniTable;
+    stmt: TSQLitePreparedStatement;
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -162,6 +165,9 @@ type
   end;
 
 implementation
+
+uses
+  Variants;
 
 {$WARNINGS OFF}
 
@@ -399,6 +405,14 @@ begin
   ReturnValue := FSQLiteDatabase.GetTableValue(SQL);
 
   Check(ReturnValue = 1);
+end;
+
+procedure TestTSQLiteDatabase.TestGetVersion;
+var
+  ReturnValue: string;
+begin
+  ReturnValue := FSQLiteDatabase.Version;
+  Check(Length(ReturnValue)>0);
 end;
 
 procedure TestTSQLiteDatabase.TestMemoryUsed;
@@ -1209,29 +1223,41 @@ end;
 
 procedure TestTSQLiteField.SetUp;
 begin
-  FSQLiteField := TSQLiteField.Create;
+  FSQLiteDatabase := TSQLiteDatabase.Create('test.db');
+  FSQLiteField := nil;
+  FDst := FSQLiteDatabase.GetPreparedStatementIntf('select * from testtable where rowid < 100').ExecQuery;
+  //stmt := FSQLiteDatabase.GetPreparedStatement('select * from testtable where rowid < 100');
+ // FDst := stmt.ExecQuery;
 end;
 
 procedure TestTSQLiteField.TearDown;
 begin
-  FSQLiteField.Free;
   FSQLiteField := nil;
+  stmt.Free;
+  FDst.Free;
+  FSQLiteDatabase.Free;
 end;
 
 procedure TestTSQLiteField.TestIsNull;
 var
   ReturnValue: Boolean;
 begin
-//  ReturnValue := FSQLiteField.IsNull;
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.IsNull;
+  CheckTrue(ReturnValue);
 end;
 
 procedure TestTSQLiteField.TestAsBlob;
 var
   ReturnValue: TMemoryStream;
 begin
-//  ReturnValue := FSQLiteField.AsBlob;
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['picture'];
+  ReturnValue := FSQLiteField.AsBlob;
+  try
+    Check(ReturnValue.Size > 0);
+  finally
+    ReturnValue.Free;
+  end;
 end;
 
 procedure TestTSQLiteField.TestAsBlobPtr;
@@ -1239,17 +1265,20 @@ var
   ReturnValue: Pointer;
   iNumBytes: Integer;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteField.AsBlobPtr(iNumBytes);
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['picture'];
+  ReturnValue := nil;
+  ReturnValue := FSQLiteField.AsBlobPtr(iNumBytes);
+  Check(ReturnValue <> nil);
+  Check(iNumBytes > 0);
 end;
 
 procedure TestTSQLiteField.TestAsBlobText;
 var
   ReturnValue: string;
 begin
-//  ReturnValue := FSQLiteField.AsBlobText;
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['notes'];
+  ReturnValue := FSQLiteField.AsBlobText;
+  Check(Length(ReturnValue)>0);
 end;
 
 procedure TestTSQLiteField.TestAsBlobTextDef;
@@ -1257,9 +1286,12 @@ var
   ReturnValue: string;
   Def: string;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteField.AsBlobTextDef(Def);
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['notes'];
+  ReturnValue := FSQLiteField.AsBlobTextDef;
+  Check(Length(ReturnValue)>0);
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.AsBlobTextDef('');
+  Check(ReturnValue = '');
 end;
 
 procedure TestTSQLiteField.TestAsDateTime;
@@ -1284,8 +1316,12 @@ procedure TestTSQLiteField.TestAsDouble;
 var
   ReturnValue: Double;
 begin
- // ReturnValue := FSQLiteField.AsDouble;
-  // TODO: Validate method results
+  FDst.Next;
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.AsDouble;
+
+
+  Check(ReturnValue < -1);
 end;
 
 procedure TestTSQLiteField.TestAsDoubleDef;
@@ -1293,17 +1329,18 @@ var
   ReturnValue: Double;
   Def: Double;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteField.AsDoubleDef(Def);
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.AsDoubleDef(-1);
+  Check(ReturnValue = -1);
 end;
 
 procedure TestTSQLiteField.TestAsInteger;
 var
   ReturnValue: Int64;
 begin
- // ReturnValue := FSQLiteField.AsInteger;
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['OtherID'];
+  ReturnValue := FSQLiteField.AsInteger;
+  Check(ReturnValue = 4);
 end;
 
 procedure TestTSQLiteField.TestAsIntegerDef;
@@ -1311,17 +1348,18 @@ var
   ReturnValue: Int64;
   Def: Int64;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteField.AsIntegerDef(Def);
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.AsIntegerDef(-1);
+  Check(ReturnValue = -1);
 end;
 
 procedure TestTSQLiteField.TestAsString;
 var
   ReturnValue: string;
 begin
- // ReturnValue := FSQLiteField.AsString;
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['Name'];
+  ReturnValue := FSQLiteField.AsString;
+  Check(Length(ReturnValue)>0);
 end;
 
 procedure TestTSQLiteField.TestAsStringDef;
@@ -1329,17 +1367,18 @@ var
   ReturnValue: string;
   Def: string;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteField.AsStringDef(Def);
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.AsStringDef('a');
+  Check(ReturnValue = 'a');
 end;
 
 procedure TestTSQLiteField.TestValue;
 var
   ReturnValue: Variant;
 begin
-//  ReturnValue := FSQLiteField.Value;
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['OtherID'];
+  ReturnValue := FSQLiteField.Value;
+  Check(ReturnValue = 4);
 end;
 
 procedure TestTSQLiteField.TestValueDef;
@@ -1347,9 +1386,9 @@ var
   ReturnValue: Variant;
   Def: Variant;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteField.ValueDef(Def);
-  // TODO: Validate method results
+  FSQLiteField := FDst.FieldByName['Number'];
+  ReturnValue := FSQLiteField.ValueDef(-1);
+  Check(ReturnValue = -1);
 end;
 
 procedure TestTSQLiteUniTable.SetUp;
@@ -1392,9 +1431,13 @@ var
   ReturnValue: TMemoryStream;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
- // ReturnValue := FSQLiteUniTable.FieldAsBlob(I);
-  // TODO: Validate method results
+  I := 5;
+  ReturnValue := FSQLiteUniTable.FieldAsBlob(I);
+  try
+    Check(ReturnValue.Size > 0);
+  finally
+    ReturnValue.Free;
+  end;
 end;
 
 procedure TestTSQLiteUniTable.TestFieldAsBlobPtr;
@@ -1403,9 +1446,11 @@ var
   iNumBytes: Integer;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
-//  ReturnValue := FSQLiteUniTable.FieldAsBlobPtr(I, iNumBytes);
-  // TODO: Validate method results
+  I := 5;
+  ReturnValue := nil;
+  ReturnValue := FSQLiteUniTable.FieldAsBlobPtr(I, iNumBytes);
+
+  Check(ReturnValue <> nil);
 end;
 
 procedure TestTSQLiteUniTable.TestFieldAsBlobText;
@@ -1413,9 +1458,9 @@ var
   ReturnValue: string;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
-//  ReturnValue := FSQLiteUniTable.FieldAsBlobText(I);
-  // TODO: Validate method results
+  I := 4;
+  ReturnValue := FSQLiteUniTable.FieldAsBlobText(I);
+  Check(Length(ReturnValue)>0);
 end;
 
 procedure TestTSQLiteUniTable.TestFieldIsNull;
@@ -1433,9 +1478,9 @@ var
   ReturnValue: string;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
-//  ReturnValue := FSQLiteUniTable.FieldAsString(I);
-  // TODO: Validate method results
+  I := 2;
+  ReturnValue := FSQLiteUniTable.FieldAsString(I);
+  Check(Length(ReturnValue)>0);
 end;
 
 procedure TestTSQLiteUniTable.TestFieldAsDouble;
@@ -1443,9 +1488,9 @@ var
   ReturnValue: Double;
   I: Cardinal;
 begin
-  // TODO: Setup method call parameters
-//  ReturnValue := FSQLiteUniTable.FieldAsDouble(I);
-  // TODO: Validate method results
+  I := 3;
+  ReturnValue := FSQLiteDatabase.GetPreparedStatementIntf('select * from testtable where Number = 1').ExecQueryIntf.FieldAsDouble(I);
+  Check(ReturnValue = 1);
 end;
 
 procedure TestTSQLiteUniTable.TestNext;
