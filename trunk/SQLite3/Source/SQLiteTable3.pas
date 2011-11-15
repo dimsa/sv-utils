@@ -508,6 +508,7 @@ type
     fParams: TObjectList<TSQliteParam>;
     FStmt: TSQLiteStmt;
     FParamsBound: Boolean;
+    FOwnedStmt: Boolean; //true = prepared statement should free sqlite stmt, false = table responsible for freeing sqlite stmt
     procedure BindParams;
     procedure SetParams(const Params: array of TVarRec);
    // function FindParam(const I: Integer): TSQliteParam; overload;
@@ -2207,7 +2208,9 @@ end;
 
 destructor TSQLiteUniTable.Destroy;
 begin
-  fStmt := nil;
+  if Assigned(fStmt) then
+    Sqlite3_Finalize(fstmt);
+
   FFields.Free;
   if Assigned(fCols) then
   begin
@@ -2833,7 +2836,7 @@ begin
       ClearParams;
     end;
 
-    if Assigned(FStmt) then
+    if Assigned(FStmt) and (FOwnedStmt) then
     begin
       Sqlite3_Finalize(FStmt);
       FStmt := nil;
@@ -2844,7 +2847,7 @@ end;
 procedure TSQLitePreparedStatement.ClearParams;
 begin
   FParamsBound := False;
-  if FStmt <> nil then
+  if (FStmt <> nil) and (FOwnedStmt) then
     sqlite3_clear_bindings(FStmt);
   fParams.Clear;
 end;
@@ -2875,6 +2878,7 @@ begin
   FSQL := '';
   FStmt := nil;
   FParamsBound := False;
+  FOwnedStmt := True;
   fParams := TObjectList<TSQliteParam>.Create(True);
 end;
 
@@ -2883,9 +2887,19 @@ begin
   FDB := nil;
   ClearParams;
   fParams.Free;
-  if Assigned(fStmt) then
+  if Assigned(fStmt) and (FOwnedStmt) then
     Sqlite3_Finalize(fstmt);
   inherited Destroy;
+end;
+
+function TSQLitePreparedStatement.ExecQuery: TSQLiteUniTable;
+begin
+  Result := ExecQuery('', []);
+end;
+
+function TSQLitePreparedStatement.ExecQuery(const SQL: string): TSQLiteUniTable;
+begin
+  Result := ExecQuery(SQL, []);
 end;
 
 {$HINTS OFF}
@@ -2900,8 +2914,9 @@ begin
 
   SetParams(Params);
 
-  {TODO -oLinas -cGeneral : exec query and get resultset}
+  {DONE -oLinas -cGeneral : exec query and get resultset}
   Result := TSQLiteUniTable.Create(FDB, FStmt);
+  FOwnedStmt := False;
 end;
 {$HINTS ON}
 
@@ -2979,16 +2994,6 @@ end;
 function TSQLitePreparedStatement.ExecSQL: Boolean;
 begin
   Result := ExecSQL('', []);
-end;
-
-function TSQLitePreparedStatement.ExecQuery: TSQLiteUniTable;
-begin
-  Result := ExecQuery('', []);
-end;
-
-function TSQLitePreparedStatement.ExecQuery(const SQL: string): TSQLiteUniTable;
-begin
-  Result := ExecQuery(SQL, []);
 end;
 
 function TSQLitePreparedStatement.ExecSQLAndMapData<T>(var DataList: TObjectList<T>): Boolean;
