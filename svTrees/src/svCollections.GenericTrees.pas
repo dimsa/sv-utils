@@ -55,6 +55,18 @@ type
     function HasChildren: Boolean;
     function HasParent: Boolean;
     function GetOwner: TSVTree<T>;
+
+    property Value: T read FValue write FValue;
+    property Parent: TSVTreeNode<T> read FParent;
+    property VirtualNode: PVirtualNode read FVirtualNode write FVirtualNode;
+    property NodeIndex: Integer read FNodeIndex;
+    property TotalCount: Cardinal read FTotalCount;
+    property ChildCount: Cardinal read FChildCount;
+
+    property LastChild: TSVTreeNode<T> read FLastChild;
+    property FirstChild: TSVTreeNode<T> read FFirstChild;
+    property NextSibling: TSVTreeNode<T> read FNextSibling;
+    property PrevSibling: TSVTreeNode<T> read FPrevSibling;
     /// <summary>
     /// SVTreeFromNode
     ///  Get the tree given node belongs to.
