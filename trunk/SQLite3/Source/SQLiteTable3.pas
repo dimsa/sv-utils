@@ -59,7 +59,7 @@
    Modified and enhanced by Linas Naginionis (lnaginionis@gmail.com)
    New home: http://code.google.com/p/sv-utils/
 }
-
+{$I sv.inc}
 interface
 
 {$IFDEF FPC}
@@ -547,11 +547,12 @@ type
     procedure SetParamVariant(const name: string; const Value: Variant); overload;
     procedure SetParamBlob(const I: Integer; const Value: TStream); overload;
     procedure SetParamBlob(const name: string; const Value: TStream); overload;
-
+    {$IFDEF DELPHI14_UP}
     /// <summary>
     /// Executes previously set SQL statement and fetches results into given class type
     /// </summary>
     function ExecSQLAndMapData<T: constructor, class>(var DataList: TObjectList<T>): Boolean;
+    {$ENDIF}
     /// <summary>
     /// Executes query which returns unidirectional table
     /// </summary>
@@ -742,7 +743,9 @@ implementation
 uses
   Variants,
   Math,
+  {$IFDEF DELPHI14_UP}
   Rtti,
+  {$ENDIF}
   TypInfo;
 
 const
@@ -2996,6 +2999,7 @@ begin
   Result := ExecSQL('', []);
 end;
 
+{$IFDEF DELPHI14_UP}
 function TSQLitePreparedStatement.ExecSQLAndMapData<T>(var DataList: TObjectList<T>): Boolean;
 var
   dst: TSQLiteUniTable;
@@ -3068,6 +3072,7 @@ begin
     end;
   end;
 end;
+{$ENDIF}
 
 (*
 function TSQLitePreparedStatement.FindParam(const name: string): TSQliteParam;
