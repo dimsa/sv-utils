@@ -403,15 +403,19 @@ type
     procedure Trim(const ACharSet: TWideCharSet); overload; inline;
     procedure TrimLeft(); overload; inline;
     procedure TrimLeft(const ACharSet: TWideCharSet); overload; inline;
+    procedure TrimLeft(const ASymbolsCount: Integer); overload; inline;
     procedure TrimRight(); overload; inline;
     procedure TrimRight(const ACharSet: TWideCharSet); overload; inline;
+    procedure TrimRight(const ASymbolsCount: Integer); overload; inline;
 
     function TrimF(): TSvString; overload; inline;
     function TrimF(const ACharSet: TWideCharSet): TSvString; overload; inline;
     function TrimLeftF(): TSvString; overload; inline;
     function TrimLeftF(const ACharSet: TWideCharSet): TSvString; overload; inline;
+    function TrimLeftF(const ASymbolsCount: Integer): TSvString; overload; inline;
     function TrimRightF(): TSvString; overload; inline;
     function TrimRightF(const ACharSet: TWideCharSet): TSvString; overload; inline;
+    function TrimRightF(const ASymbolsCount: Integer): TSvString; overload; inline;
 
     procedure ToUpper(); inline;
     procedure ToUpperInvariant(); inline;
@@ -1734,6 +1738,17 @@ begin
   FValue := CEmpty;
 end;
 
+procedure TSvString.TrimLeft(const ASymbolsCount: Integer);
+begin
+  FValue := System.Copy(FValue, ASymbolsCount, Length);
+end;
+
+function TSvString.TrimLeftF(const ASymbolsCount: Integer): TSvString;
+begin
+  Result.FValue := FValue;
+  Result.TrimLeft(ASymbolsCount);
+end;
+
 function TSvString.TrimLeftF(const ACharSet: TWideCharSet): TSvString;
 begin
   Result.FValue := FValue;
@@ -1831,6 +1846,17 @@ var
   s1 := FValue;
   SetLength(Result, System.Length(s1) * 4);
   BinToHex(s1[1], PWideChar(Result), System.Length(s1) * SizeOf(Char));
+end;
+
+procedure TSvString.TrimRight(const ASymbolsCount: Integer);
+begin
+  FValue := System.Copy(FValue, 1, Length - ASymbolsCount);
+end;
+
+function TSvString.TrimRightF(const ASymbolsCount: Integer): TSvString;
+begin
+  Result.FValue := FValue;
+  Result.TrimRight(ASymbolsCount);
 end;
 
 { TSvString.TEnumerator }
