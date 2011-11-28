@@ -258,6 +258,7 @@ type
     /// </summary>
     /// <param name="SQL">SQL statement which should not return resultset</param>
     procedure ExecSQL(const SQL: String); overload;
+    procedure ExecSQL(const SQL: String; var RowsAffected: Integer); overload;
     procedure ExecSQL(Query: TSQLiteQuery); overload;
     function PrepareSQL(const SQL: String): TSQLiteQuery;
     procedure BindSQL(Query: TSQLiteQuery; const Index: Integer; const Value: Integer); overload;
@@ -1077,6 +1078,12 @@ begin
     Sqlite3_Reset(Query.Statement);
   end;
 end;
+
+procedure TSQLiteDatabase.ExecSQL(const SQL: String; var RowsAffected: Integer);
+begin
+  GetPreparedStatementIntf(SQL).ExecSQL(RowsAffected);
+end;
+
 {$WARNINGS ON}
 
 {$WARNINGS OFF}
@@ -2295,6 +2302,9 @@ begin
   Result := fEOF;
 end;
 
+/// <summary>
+/// Creates new TMemoryStream object on succesful retrieval. Do not forget to free it afterwards!
+/// </summary>
 function TSQLiteUniTable.FieldAsBlob(I: cardinal): TMemoryStream;
 var
   iNumBytes: integer;
@@ -2304,7 +2314,7 @@ begin
   iNumBytes := Sqlite3_ColumnBytes(fstmt, i);
   if iNumBytes > 0 then
   begin
-    Result := TMemoryStream.Create;
+    Result := TMemoryStream.Create; // potential memory leak if result not freed after this function call
     ptr := Sqlite3_ColumnBlob(fstmt, i);
     //call it again - see sqlite docs
     iNumBytes := Sqlite3_ColumnBytes(fstmt, i);
@@ -2312,7 +2322,7 @@ begin
     Result.Position := 0;
   end
   else
-  Result := nil;
+    Result := nil;
 
 end;
 
