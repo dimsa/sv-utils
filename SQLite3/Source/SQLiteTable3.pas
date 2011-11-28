@@ -72,7 +72,7 @@ uses
   {$IFDEF WIN32}
   Winapi.Windows,
   {$ENDIF}
-  System.Classes, System.SysUtils, System.Generics.Collections, System.DB;
+  System.Classes, System.SysUtils, System.Generics.Collections, DB;
   {$ELSE}
   {$IFDEF WIN32}
   Windows,
@@ -259,12 +259,29 @@ type
     /// <param name="SQL">SQL statement which should not return resultset</param>
     procedure ExecSQL(const SQL: String); overload;
     procedure ExecSQL(const SQL: String; var RowsAffected: Integer); overload;
-    procedure ExecSQL(Query: TSQLiteQuery); overload;
+    procedure ExecSQL(const SQL: String; const AParams: array of const); overload;
+    procedure ExecSQL(const SQL: String; const AParams: array of const; var RowsAffected: Integer); overload;
+    procedure ExecSQL(Query: TSQLiteQuery); overload; deprecated;
+
     function PrepareSQL(const SQL: String): TSQLiteQuery;
     procedure BindSQL(Query: TSQLiteQuery; const Index: Integer; const Value: Integer); overload;
     procedure BindSQL(Query: TSQLiteQuery; const Index: Integer; const Value: String); overload;
     procedure ReleaseSQL(Query: TSQLiteQuery);
-    function GetUniTable(const SQL: String): TSQLiteUniTable; deprecated;
+    /// <summary>
+    /// Gets very fast unidirectional resultset
+    /// </summary>
+    /// <param name="SQL">SQL statement</param>
+    /// <returns>TSQLiteUniTable</returns>
+    function GetUniTable(const SQL: String): TSQLiteUniTable; overload;
+    function GetUniTable(const SQL: String; const AParams: array of const): TSQLiteUniTable; overload;
+     /// <summary>
+    /// Gets very fast unidirectional resultset as an interface
+    /// </summary>
+    /// <param name="SQL">SQL statement</param>
+    /// <returns>ISQLiteTable interface</returns>
+    function GetUniTableIntf(const SQL: string): ISQLiteTable; overload;
+    function GetUniTableIntf(const SQL: string; const AParams: array of const): ISQLiteTable; overload;
+
     function GetTableValue(const SQL: String): int64;
     function GetTableString(const SQL: String): string;
     procedure GetTableStrings(const SQL: String; const Value: TStrings);
@@ -374,9 +391,12 @@ type
     property Filename: TFileName read FFilename write SetFilename;
     property Functions: TSQLiteFunctions read FFunctions;
     property ReadUncommitted: Boolean read FReadUncommitted write SetReadUncommitted default False;
-    //database rows that were changed (or inserted or deleted) by the most recent SQL statement
-    property RowsChanged : integer read getRowsChanged;
-    property Synchronised: boolean read FSync write SetSynchronised default False;
+     ///	<summary>
+    ///	  Database rows that were changed (or inserted or deleted) by the most
+    ///	  recent SQL statement
+    ///	</summary>
+    property RowsChanged : Integer read getRowsChanged;
+    property Synchronised: Boolean read FSync write SetSynchronised default False;
 
 
     //events
@@ -1079,9 +1099,22 @@ begin
   end;
 end;
 
+procedure TSQLiteDatabase.ExecSQL(const SQL: String; const AParams: array of const);
+var
+  iRows: Integer;
+begin
+  ExecSQL(SQL, AParams, iRows);
+end;
+
+procedure TSQLiteDatabase.ExecSQL(const SQL: String; const AParams: array of const; var RowsAffected: Integer);
+begin
+  if not (GetPreparedStatementIntf(SQL, AParams).ExecSQL(RowsAffected)) then
+    RowsAffected := 0;
+end;
+
 procedure TSQLiteDatabase.ExecSQL(const SQL: String; var RowsAffected: Integer);
 begin
-  GetPreparedStatementIntf(SQL).ExecSQL(RowsAffected);
+  ExecSQL(SQL, [], RowsAffected);
 end;
 
 {$WARNINGS ON}
@@ -1243,18 +1276,37 @@ end;
 
 {$HINTS OFF}
 function TSQLiteDatabase.GetUniTable(const SQL: string): TSQLiteUniTable;
+begin
+  Result := GetUniTable(SQL, []);
+end;
+
+function TSQLiteDatabase.GetUniTable(const SQL: String; const AParams: array of const): TSQLiteUniTable;
 var
   stmt: TSQLitePreparedStatement;
 begin
   Result := nil;
-  stmt := TSQLitePreparedStatement.Create(Self);
+  stmt := GetPreparedStatement(SQL, AParams);
   try
     Result := stmt.ExecQuery(SQL);
-   // Result := TSQLiteUniTable.Create(Self, SQL);
   finally
     stmt.Free;
   end;
 end;
+
+function TSQLiteDatabase.GetUniTableIntf(const SQL: string; const AParams: array of const): ISQLiteTable;
+var
+  stmt: ISQLitePreparedStatement;
+begin
+  Result := nil;
+  stmt := GetPreparedStatementIntf(SQL, AParams);
+  Result := stmt.ExecQueryIntf(SQL);
+end;
+
+function TSQLiteDatabase.GetUniTableIntf(const SQL: string): ISQLiteTable;
+begin
+  Result := GetUniTableIntf(SQL, []);
+end;
+
 {$HINTS ON}
 
 class procedure TSQLiteDatabase.InitDefaultColumnTypes;

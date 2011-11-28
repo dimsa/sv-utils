@@ -198,13 +198,48 @@ end;
 procedure TestTSQLiteDatabase.TestGetTable;
 var
   ReturnValue: TSQLiteTable;
+  tbl: TSQLiteUniTable;
   SQL: string;
+  aVal: Variant;
+  itbl, iDst: ISQLiteTable;
 begin
   SQL := 'select * from testtable';
 
   ReturnValue := FSQLiteDatabase.GetTable(SQL);
   try
     Check((ReturnValue.ColCount > 0) and (ReturnValue.RowCount > 0));
+
+
+    tbl := FSQLiteDatabase.GetUniTable(SQL);
+    try
+      Check(not tbl.EOF);
+
+      aVal := tbl.Fields[0].Value;
+
+      Check(not VarIsNull(aVal));
+    finally
+      tbl.Free;
+    end;
+
+
+    itbl := FSQLiteDatabase.GetUniTableIntf(SQL);
+
+    Check(not itbl.EOF);
+
+    aVal := itbl.Fields[0].Value;
+
+    Check(not VarIsNull(aVal));
+
+    SQL := 'select * from testtable where ID > ?';
+
+    iDst := FSQLiteDatabase.GetUniTableIntf(SQL, [10]);
+
+    Check(not iDst.EOF);
+
+    aVal := iDst.Fields[0].Value;
+
+    Check(not VarIsNull(aVal));
+    Check(aVal > 10);
   finally
     ReturnValue.Free;
   end;
