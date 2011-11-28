@@ -39,6 +39,7 @@ type
     procedure TestReplace;
     procedure TestJoin;
     procedure TestSplit;
+    procedure TestValueOf;
   end;
 
 implementation
@@ -412,6 +413,16 @@ begin
   FString.TrimRight([',']);
 
   Check(FString = s);
+end;
+
+procedure TestTSvString.TestValueOf;
+var
+  sText: string;
+  i: Integer;
+begin
+  i := 10;
+  sText := 'value of i is ' + TSvString.ValueOf(i) + '.';
+  Check(sText = 'value of i is 10.');
 end;
 
 initialization

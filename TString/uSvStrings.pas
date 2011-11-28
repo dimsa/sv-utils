@@ -426,6 +426,8 @@ type
     function ToUpperInvariantF(): TSvString; inline;
     function ToLowerF(): TSvString; inline;
     function ToLowerInvariantF(): TSvString; inline;
+
+    class function ValueOf(const AVar: Variant): TSvString; static; inline;
   end;
 
   /// <summary>
@@ -1857,6 +1859,11 @@ function TSvString.TrimRightF(const ASymbolsCount: Integer): TSvString;
 begin
   Result.FValue := FValue;
   Result.TrimRight(ASymbolsCount);
+end;
+
+class function TSvString.ValueOf(const AVar: Variant): TSvString;
+begin
+  Result.FValue := AVar;
 end;
 
 { TSvString.TEnumerator }
