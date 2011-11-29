@@ -12,6 +12,7 @@ var
   stmt: ISQLitePreparedStatement;
   dst: ISQLiteTable;
   iVal: Integer;
+  ARec: Variant;
 begin
   DB := TSQLiteDatabase.Create('test.db');
   try
@@ -25,6 +26,12 @@ begin
       iVal := dst['ID'].AsInteger;
 
       dst.Next;
+    end;
+    //or you can use For each loop
+    dst := stmt.ExecQueryIntf;
+    for ARec in dst do
+    begin
+      iVal := ARec.ID; //get value from the field name ID
     end;
   finally
     DB.Free;
