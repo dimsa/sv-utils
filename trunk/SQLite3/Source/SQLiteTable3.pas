@@ -644,6 +644,22 @@ type
   end;
 
   /// <summary>
+  /// TSQLiteUniTable enumerator
+  ///  for ARec in Dataset do...
+  /// </summary>
+  TUniTableEnumerator = class
+  private
+    FMoveToFirst: Boolean;
+    FDataSet: TSQLiteUniTable;
+    function GetCurrent: Variant;
+  public
+    constructor Create(ATable: TSQLiteUniTable);
+    destructor Destroy; override;
+    function MoveNext: Boolean;
+    property Current: Variant read GetCurrent;
+  end;
+
+  /// <summary>
   /// Interface of SQLite table
   /// </summary>
   ISQLiteTable = interface
@@ -660,6 +676,8 @@ type
     function GetFieldIndex(const FieldName: string): integer;
     function GetFieldByName(const FieldName: string): TSQLiteField;
     procedure SetFieldByName(const FieldName: string; const Value: TSQLiteField);
+
+    function GetEnumerator: TUniTableEnumerator;
 
     function FindField(const AFieldName: string): TSQLiteField;
     function FieldAsInteger(I: Cardinal): int64;
@@ -712,6 +730,7 @@ type
     function GetFieldCount: Cardinal;
     function GetRow: Cardinal;
     function GetEOF: Boolean;
+    function GetCurrentRec: Variant;
   protected
     procedure SetFields(I: Cardinal; const Value: Variant);
     function GetFieldsVal(I: Cardinal): Variant; virtual;
@@ -721,6 +740,10 @@ type
     constructor Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
     destructor Destroy; override;
+
+    function GetEnumerator: TUniTableEnumerator;
+    property CurrentRec: Variant read GetCurrentRec;
+
     /// <summary>
     /// Checks if fieldname exists
     /// </summary>
@@ -768,6 +791,87 @@ uses
   Rtti,
   {$ENDIF}
   TypInfo;
+
+type
+  { A custom variant type that implements the mapping from the property names
+    to the DataSet fields. }
+  TVarDataRecordType = class(TInvokeableVariantType)
+  public
+    procedure Clear(var V: TVarData); override;
+    procedure Copy(var Dest: TVarData; const Source: TVarData; const Indirect: Boolean); override;
+    function GetProperty(var Dest: TVarData; const V: TVarData; const Name: string): Boolean; override;
+    function SetProperty(const V: TVarData; const Name: string; const Value: TVarData): Boolean; override;
+  end;
+
+type
+  { Our layout of the variants record data.
+    We only hold a pointer to the DataSet. }
+  TVarDataRecordData = packed record
+    VType: TVarType;
+    Reserved1, Reserved2, Reserved3: Word;
+    DataSet: TSQLiteUniTable;
+    Reserved4: LongInt;
+  end;
+
+var
+  { The global instance of the custom variant type. The data of the custom
+    variant is stored in a TVarData record, but the methods and properties
+    are implemented in this class instance. }
+  VarDataRecordType: TVarDataRecordType = nil;
+
+{ A global function the get our custom VarType value. This may vary and thus
+  is determined at runtime. }
+function VarDataRecord: TVarType;
+begin
+  result := VarDataRecordType.VarType;
+end;
+
+{ A global function that fills the VarData fields with the correct values. }
+function VarDataRecordCreate(ADataSet: TSQLiteUniTable): Variant;
+begin
+  VarClear(result);
+  TVarDataRecordData(result).VType := VarDataRecord;
+  TVarDataRecordData(result).DataSet := ADataSet;
+end;
+
+procedure TVarDataRecordType.Clear(var V: TVarData);
+begin
+  { No fancy things to do here, we are only holding a pointer to a TDataSet and
+    we are not supposed to destroy it here. }
+  SimplisticClear(V);
+end;
+
+procedure TVarDataRecordType.Copy(var Dest: TVarData; const Source: TVarData; const Indirect: Boolean);
+begin
+  { No fancy things to do here, we are only holding a pointer to a TDataSet and
+    that can simply be copied here. }
+  SimplisticCopy(Dest, Source, Indirect);
+end;
+
+function TVarDataRecordType.GetProperty(var Dest: TVarData; const V: TVarData; const Name: string): Boolean;
+var
+  fld: TSQLiteField;
+begin
+  { Find a field with the property's name. If there is one, return its current value. }
+  fld := TVarDataRecordData(V).DataSet.FieldByName[Name];
+  result := (fld <> nil);
+  if result then
+    Variant(dest) := fld.Value;
+end;
+
+function TVarDataRecordType.SetProperty(const V: TVarData; const Name: string; const Value: TVarData): Boolean;
+{var
+  fld: TField;}
+begin
+  Assert(False, 'Cannot set field value for unidirectional table');
+  { Find a field with the property's name. If there is one, set its value. }
+ // fld := TVarDataRecordData(V).DataSet.FieldByName[Name];
+ { result := (fld <> nil);
+  if result then begin
+    TVarDataRecordData(V).DataSet.Edit;
+    fld.Value := Variant(Value);
+  end;}
+end;
 
 const
   //default supported column types defined in sqlite db
@@ -2349,6 +2453,11 @@ begin
 
 end;
 
+function TSQLiteUniTable.GetEnumerator: TUniTableEnumerator;
+begin
+  Result := TUniTableEnumerator.Create(Self);
+end;
+
 function TSQLiteUniTable.GetEOF: Boolean;
 begin
   Result := fEOF;
@@ -2447,6 +2556,11 @@ end;
 function TSQLiteUniTable.GetColumns(I: integer): string;
 begin
   Result := FColNames[I];
+end;
+
+function TSQLiteUniTable.GetCurrentRec: Variant;
+begin
+  Result := VarDataRecordCreate(Self);
 end;
 
 function TSQLiteUniTable.GetField(I: Integer): TSQLiteField;
@@ -3533,12 +3647,45 @@ begin
   Result := sqlite3_value_text16(ArgValue^);
 end;
 
+{ TSQLiteUniTable.TUniTableEnumerator }
+
+constructor TUniTableEnumerator.Create(ATable: TSQLiteUniTable);
+begin
+  inherited Create();
+  FDataSet := ATable;
+  FMoveToFirst := True;
+end;
+
+destructor TUniTableEnumerator.Destroy;
+begin
+  FDataSet := nil;
+  inherited Destroy;
+end;
+
+function TUniTableEnumerator.GetCurrent: Variant;
+begin
+  Result := FDataSet.CurrentRec;
+end;
+
+function TUniTableEnumerator.MoveNext: Boolean;
+begin
+  if FMoveToFirst then
+  begin
+    FMoveToFirst := False;
+    Result := not FDataSet.EOF;
+  end
+  else
+    Result := FDataSet.Next;
+end;
+
 initialization
   TSQLiteDatabase.FColumnTypes := TDictionary<string,Integer>.Create(DEF_COLCOUNT);
   TSQLiteDatabase.InitDefaultColumnTypes;
 
+  VarDataRecordType := TVarDataRecordType.Create;
+
 finalization
   TSQLiteDatabase.FColumnTypes.Free;
-
+  FreeAndNil(VarDataRecordType);
 end.
 

@@ -162,6 +162,7 @@ type
     procedure TestFieldAsString;
     procedure TestFieldAsDouble;
     procedure TestNext;
+    procedure TestForInLoop;
   end;
 
 implementation
@@ -1449,6 +1450,39 @@ begin
   AFieldName := 'Number';
   ReturnValue := FSQLiteUniTable.FindField(AFieldName);
   Check(ReturnValue <> nil);
+end;
+
+procedure TestTSQLiteUniTable.TestForInLoop;
+var
+  ARec: Variant;
+  iCount, iCorrectCount: Integer;
+  tbl: TSQLiteTable;
+  iDst: ISQLiteTable;
+begin
+  iCount := 0;
+  for ARec in FSQLiteUniTable do
+  begin
+    Check(ARec.ID > 0);
+    Inc(iCount);
+  end;
+
+  tbl := FSQLiteDatabase.GetTable('select * from testtable');
+  try
+    iCorrectCount := tbl.RowCount;
+    Check(tbl.RowCount = iCount);
+  finally
+    tbl.Free;
+  end;
+
+  iDst := FSQLiteDatabase.GetUniTableIntf('select * from testtable');
+  iCount := 0;
+  for ARec in iDst do
+  begin
+    Check(ARec.ID > 0);
+    Inc(iCount);
+  end;
+
+  Check(iCount = iCorrectCount);
 end;
 
 procedure TestTSQLiteUniTable.TestFieldAsInteger;
