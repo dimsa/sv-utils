@@ -96,6 +96,8 @@ type
 
     class operator Implicit(const AString: TSvString): Variant; inline;
 
+    class operator Implicit(const AValue: Variant): TSvString; inline;
+
     class operator Add(const ALeft, ARight: TSvString): TSvString; inline;
 
     class operator Equal(const ALeft: TSvString; const ARight: TSvString): Boolean; inline;
@@ -916,6 +918,11 @@ end;
 class operator TSvString.Implicit(const AString: TSvString): Variant;
 begin
   Result := AString.FValue;
+end;
+
+class operator TSvString.Implicit(const AValue: Variant): TSvString;
+begin
+  Result.FValue := AValue;
 end;
 
 function TSvString.IndexOf(const AWhat: string; const ACompareOption: TStringComparison): NativeInt;
