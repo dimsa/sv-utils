@@ -1,0 +1,48 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{5717B21D-D6FE-433C-8DFA-E07EE27C5132}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="ProjSerializer.dproj">
+				<Dependencies/>
+			</Projects>
+			<Projects Include="Test\SvSerializerTests.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="ProjSerializer">
+			<MSBuild Projects="ProjSerializer.dproj"/>
+		</Target>
+		<Target Name="ProjSerializer:Clean">
+			<MSBuild Projects="ProjSerializer.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="ProjSerializer:Make">
+			<MSBuild Projects="ProjSerializer.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="SvSerializerTests">
+			<MSBuild Projects="Test\SvSerializerTests.dproj"/>
+		</Target>
+		<Target Name="SvSerializerTests:Clean">
+			<MSBuild Projects="Test\SvSerializerTests.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="SvSerializerTests:Make">
+			<MSBuild Projects="Test\SvSerializerTests.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="ProjSerializer;SvSerializerTests"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="ProjSerializer:Clean;SvSerializerTests:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="ProjSerializer:Make;SvSerializerTests:Make"/>
+		</Target>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
+	</Project>
