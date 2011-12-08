@@ -401,7 +401,6 @@ var
   FPair: TJSONPair;
   APropName: string;
   I: Integer;
-  recType: TRttiRecordType;
   AField: TRttiField;
 begin
   inherited;
@@ -478,7 +477,7 @@ end;
 
 function TSvJsonSerializerFactory.SetValue(const AFrom: TJSONValue; const AObj: TValue; AProp: TRttiProperty; AType: TRttiType; var Skip: Boolean): TValue;
 var
-  AInt, i, j: Integer;
+  AInt, i: Integer;
   AInt64: Int64;
   sVal: string;
   arrVal: array of TValue;
