@@ -14,6 +14,13 @@ uses
   Classes, SvSerializer, SysUtils, DBXJSON, Rtti, Types;
 
 type
+  TSvJsonString = class(TJSONString)
+  private
+    function EscapeValue(const AValue: string): string;
+  public
+    constructor Create(const AValue: string); overload;
+  end;
+
   TSvJsonSerializerFactory = class(TSvSerializerFactory)
   private
     FMainObj: TJSONObject;
@@ -724,6 +731,31 @@ begin
       Skip := True;
       PostError('Unsupported value type: ' + AFrom.ToString);
        // raise ESvSerializeException.Create('Unsupported value type: ' + AFrom.ClassName)
+    end;
+  end;
+end;
+
+{ TSvJsonString }
+
+constructor TSvJsonString.Create(const AValue: string);
+begin
+  inherited Create(EscapeValue(AValue));
+end;
+
+function TSvJsonString.EscapeValue(const AValue: string): string;
+var
+  AChar: Char;
+begin
+  Result := '';
+  for AChar in AValue do
+  begin
+    if CharInSet(AChar, ['"','/','\']) then
+    begin
+      Result := '\' + AChar;
+    end
+    else
+    begin
+      Result := Result + AChar;
     end;
   end;
 end;
