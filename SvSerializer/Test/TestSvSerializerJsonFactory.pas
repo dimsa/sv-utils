@@ -185,7 +185,7 @@ end;
 const
   KEY_VALUE: string = 'Main';
 
-  PROP_STRING = 'Some unicode Português Русский Ελληνικά';
+  PROP_STRING = 'Some unicode Português " Русский Ελληνικά';
   PROP_INTEGER : Integer = MaxInt;
   PROP_DOUBLE: Double = 15865874.1569854;
   PROP_ENUM: TDemoEnum = deThree;
@@ -320,7 +320,7 @@ begin
 
     CheckTrue(FileExists(FILE_SERIALIZE));
 
-    FSerializer.RemoveObject(KEY_VALUE);
+   // FSerializer.RemoveObject(KEY_VALUE);
     CheckTrue(FSerializer.Count = 0);
     //recreate our object to make sure that it's values reset to their initial state
     TestObj.Free;
