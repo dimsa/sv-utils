@@ -35,10 +35,11 @@
 
 unit SvSerializer;
 
+{$I sv.inc}
 interface
 
 uses
-  SysUtils, Classes, Rtti, Generics.Collections, Types, TypInfo;
+  SysUtils, Classes, Rtti, Generics.Collections, Types, TypInfo, Strutils;
 
 type
   TSvVisibilities = set of TMemberVisibility;
