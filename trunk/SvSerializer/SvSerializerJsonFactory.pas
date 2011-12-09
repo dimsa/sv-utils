@@ -8,6 +8,7 @@
 
 unit SvSerializerJsonFactory;
 
+{$I sv.inc}
 interface
 
 uses
@@ -53,7 +54,8 @@ implementation
 
 uses
   TypInfo,
-  Variants;
+  Variants,
+  StrUtils;
 
 { TSvJsonSerializerFactory }
 
@@ -284,16 +286,16 @@ begin
         end
         else
         begin
-          Result := TJSONString.Create(AFrom.ToString);
+          Result := TSvJsonString.Create(AFrom.ToString);
         end;
       end;
       tkSet:
       begin
-        Result := TJSONString.Create(AFrom.ToString);
+        Result := TSvJsonString.Create(AFrom.ToString);
       end;
       tkFloat: Result := TJSONNumber.Create(AFrom.AsExtended);
       tkString, tkWChar, tkLString, tkWString, tkChar, tkUString:
-        Result := TJSONString.Create(AFrom.AsString);
+        Result := TSvJsonString.Create(AFrom.AsString);
       tkArray, tkDynArray:
       begin
         Result := TJSONArray.Create();
@@ -310,7 +312,7 @@ begin
         if VarIsNull(AVariant) or VarIsEmpty(AVariant) then
           Result := TJSONNull.Create
         else
-          Result := TJSONString.Create(VarToStr(AVariant));
+          Result := TSvJsonString.Create(VarToStr(AVariant));
       end;
       tkClass:
       begin
@@ -382,12 +384,12 @@ begin
       begin
         if ADef <> '' then
         begin
-          Result := TJSONString.Create(ADef);
+          Result := TSvJsonString.Create(ADef);
         end
         else
         begin
           PostError('Unsupported type: ' + AFrom.ToString);
-          Result := TJSONString.Create('Unsupported type: ' + AFrom.ToString);
+          Result := TSvJsonString.Create('Unsupported type: ' + AFrom.ToString);
         //  raise ESvSerializeException.Create('Unsupported type: ' + AFrom.ToString);
         end;
 
@@ -431,7 +433,7 @@ begin
 
           APropName := rprop.Name;
                     
-          FPair := TJSONPair.Create(TJSONString.Create(APropName), GetValue(AValue, rprop));
+          FPair := TJSONPair.Create(TSvJsonString.Create(APropName), GetValue(AValue, rprop));
 
           FObj.AddPair(FPair);
         end;        
@@ -445,7 +447,8 @@ begin
         begin
           AValue := AField.GetValue(obj.GetReferenceToRawData);
           APropName := AField.Name;
-          FPair := TJSONPair.Create(TJSONString.Create(APropName), GetValue(AValue, TRttiProperty(AField)));
+          FPair := TJSONPair.Create(TSvJsonString.Create(APropName),
+            GetValue(AValue, TRttiProperty(AField)));
 
           FObj.AddPair(FPair);
         end;
@@ -468,7 +471,8 @@ begin
             else
               APropName := svAttr.Name;
 
-            FPair := TJSONPair.Create(TJSONString.Create(APropName), GetValue(AValue, rprop, svAttr.DefValue));
+            FPair := TJSONPair.Create(TSvJsonString.Create(APropName),
+              GetValue(AValue, rprop, svAttr.DefValue));
 
             FObj.AddPair(FPair);
           end;
@@ -739,23 +743,80 @@ end;
 
 constructor TSvJsonString.Create(const AValue: string);
 begin
+  {$IFDEF DELPHI16_UP}
+  //it seems that XE2 escapes string properly
+  inherited Create(AValue);
+  {$ELSE}
   inherited Create(EscapeValue(AValue));
+  {$ENDIF}
 end;
 
 function TSvJsonString.EscapeValue(const AValue: string): string;
 var
+  i, ix: Integer;
   AChar: Char;
-begin
-  Result := '';
-  for AChar in AValue do
+
+  procedure AddChars(const AChars: string; var Dest: string; var AIndex: Integer); inline;
   begin
-    if CharInSet(AChar, ['"','/','\']) then
-    begin
-      Result := '\' + AChar;
-    end
-    else
-    begin
-      Result := Result + AChar;
+    System.Insert(AChars, Dest, AIndex);
+    System.Delete(Dest, AIndex + 2, 1);
+    Inc(AIndex);
+  end;
+
+  procedure AddUnicodeChars(const AChars: string; var Dest: string; var AIndex: Integer); inline;
+  begin
+    System.Insert(AChars, Dest, AIndex);
+    System.Delete(Dest, AIndex + 6, 1);
+    Inc(AIndex, 6);
+  end;
+
+begin
+  Result := AValue;
+  ix := 1;
+  for i := 1 to System.Length(AValue) do
+  begin
+    AChar :=  AValue[i];
+    case AChar of
+      '/', '\', '"':
+      begin
+        System.Insert('\', Result, ix);
+        Inc(ix, 2);
+      end;
+      #8:  //backspace \b
+      begin
+        AddChars('\b', Result, ix);
+      end;
+      #9:
+      begin
+        AddChars('\t', Result, ix);
+      end;
+      #10:
+      begin
+        AddChars('\n', Result, ix);
+      end;
+      #12:
+      begin
+        AddChars('\f', Result, ix);
+      end;
+      #13:
+      begin
+        AddChars('\r', Result, ix);
+      end;
+      #0 .. #7, #11, #14 .. #31:
+      begin
+        AddUnicodeChars('\u' + IntToHex(Word(AChar), 4), Result, ix);
+      end
+      else
+      begin
+        if Word(AChar) > 127 then
+        begin
+          AddUnicodeChars('\u' + IntToHex(Word(AChar), 4), Result, ix);
+        end
+        else
+        begin
+          Inc(ix);
+        end;
+      end;
     end;
   end;
 end;

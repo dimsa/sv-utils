@@ -121,6 +121,7 @@ type
     procedure TestAddObjectProperties();
     procedure TestRemoveObject();
     procedure TestSerializeRecord();
+    procedure TestEscapeValue();
   end;
 
 implementation
@@ -129,7 +130,8 @@ uses
   Variants,
   DateUtils,
   TypInfo,
-  Rtti;
+  Rtti,
+  Diagnostics;
 
 const
   FILE_SERIALIZE = 'TestSerialize.json';
@@ -185,7 +187,7 @@ end;
 const
   KEY_VALUE: string = 'Main';
 
-  PROP_STRING = 'Some unicode Português " Русский Ελληνικά';
+  PROP_STRING = 'Some unicode Português " Русский/ Ελληνικά';
   PROP_INTEGER : Integer = MaxInt;
   PROP_DOUBLE: Double = 15865874.1569854;
   PROP_ENUM: TDemoEnum = deThree;
@@ -225,6 +227,199 @@ begin
   finally
     TestObj.Free;
   end;
+end;
+
+procedure TestTSvJsonSerializerFactory.TestEscapeValue;
+
+  function EscapeValue(const AValue: string): string;
+  var
+    i, ix: Integer;
+    AChar: Char;
+
+    procedure AddChars(const AChars: string; var Dest: string; var AIndex: Integer); inline;
+    begin
+      System.Insert(AChars, Dest, AIndex);
+      System.Delete(Dest, AIndex + 2, 1);
+      Inc(AIndex);
+    end;
+
+    procedure AddUnicodeChars(const AChars: string; var Dest: string; var AIndex: Integer); inline;
+    begin
+      System.Insert(AChars, Dest, AIndex);
+      System.Delete(Dest, AIndex + 6, 1);
+      Inc(AIndex, 5);
+    end;
+
+  begin
+    Result := AValue;
+    ix := 1;
+    for i := 1 to System.Length(AValue) do
+    begin
+      AChar :=  AValue[i];
+      case AChar of
+        '/', '\', '"':
+        begin
+          System.Insert('\', Result, ix);
+          Inc(ix, 2);
+        end;
+        #8:  //backspace \b
+        begin
+          AddChars('\b', Result, ix);
+        end;
+        #9:
+        begin
+          AddChars('\t', Result, ix);
+        end;
+        #10:
+        begin
+          AddChars('\n', Result, ix);
+        end;
+        #12:
+        begin
+          AddChars('\f', Result, ix);
+        end;
+        #13:
+        begin
+          AddChars('\r', Result, ix);
+        end;
+        #0 .. #7, #11, #14 .. #31:
+        begin
+          AddUnicodeChars('\u' + IntToHex(Word(AChar), 4), Result, ix);
+        end
+        else
+        begin
+          if Word(AChar) > 255 then
+          begin
+            AddUnicodeChars('\u' + IntToHex(Word(AChar), 4), Result, ix);
+          end
+          else
+          begin
+            Inc(ix);
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  function EscapeJSONString(const ws: Ansistring): Ansistring;
+  var
+    i: Integer;
+    wc: WideChar;
+  begin
+    i := 1;
+    result := '"';
+    while i <= length(ws) do begin
+      case ws[i] of
+        '/', '\', '"': result := result + '\' + ws[i];
+        #8: result := result + '\b';
+        #9: result := result + '\t';
+        #10: result := result + '\n';
+        #13: result := result + '\r';
+        #12: result := result + '\f';
+      else if (ord(ws[i]) < 32) then result := result + '\u' + inttohex(ord(ws[i]), 4)
+        else if (ord(ws[i]) > 127)
+        then begin
+          wc := widestring(ws[i])[1];
+          result := result + '\u' + inttohex(ord(PChar(@(wc))[1]), 2) + inttohex(ord(PChar(@(wc))[0]), 2)
+          // '\u' + inttohex(ord(ws[i]), 4)
+        end
+        else result := result + ws[i];
+      end;
+      inc(i);
+    end;
+    result := result + '"';
+  end;
+
+
+  function JSONWideString(const ws: String): string;
+  var
+    C: char;
+  begin
+    result := '"';
+    for C in ws do begin
+      if ord(C) > 255
+      then result := result + '\u' + IntToHex(ord(C), 4) //Format('\u%.04x', [ord(C)])
+      else
+        case C of
+          #0 .. #7, #9, #11, #12, #14 .. #31: result := result + '\u' + IntToHex(ord(C), 4);// Format('\u%.04x', [ord(C)]);
+          #8: result := result + '\t';
+          #10: result := result + '\n';
+          #13: result := result + '\r';
+          '"': result := result + '\"';
+          '\': result := result + '\\';
+        else result := result + C;
+        end;
+    end;
+
+    result := result + '"';
+  end;
+
+var
+  sTest, sRes: string;
+  sw: TStopwatch;
+  i: Integer;
+  iMs1, iMs2, iMs3: Int64;
+
+const
+  CTITERATIONS = 100000;
+  cTest: string = 'Lorem ipsum dolor sit amet consectetuer euismod a "sed" adipiscing neque. Pretium ac Donec id facilisi eget sociis Nullam lacinia pharetra Sed. Eu Vivamus Nullam tincidunt malesuada Morbi ac felis mi Praesent lobortis. Lorem Sed tincidunt at interdum '+
+    'Aenean metus Curabitur et metus fames. Suscipit Donec nunc adipiscing ligula id elit nonummy a et. '+#10+
+		'Congue Aliquam Nam pede mauris/ laoreet cursus ipsum Praesent congue quis. Vitae cursus ut at orci tellus Aenean Phasellus elit dictumst urna.'+
+    ' Lacinia tellus arcu a elit pretium lobortis nec dis elit convallis. Pede congue ut ac eget In orci Nunc In auctor a. Metus'+
+    ' penatibus orci nibh Proin et odio habitasse cursus et aliquam. Ac lacinia tortor nibh habitasse augue Vestibulum Quisque wisi. '+#10+
+		'Id elit pellentesque quis facilisis et Vestibulum accumsan quis eu "Vivamus". Adipiscing Nam egestas ac'+
+    ' hac feugiat a vestibulum rutrum in facilisi. Scelerisque pretium vitae pede nunc mauris mauris congue lobortis metus molestie. Morbi fermentum pretium sagittis Ma'+
+    'ecenas risus Integer et Nullam malesuada felis. Laoreet augue Aenean lacus dolor nec arcu congue tristique In feugiat. Cursus tincidunt semper nascetur. '+#10+
+		'Auctor et sed dui Nulla nec \faucibus Ut at\ vel et. Est Lorem Lorem orci amet condimentum hendrerit'+
+    ' elit Morbi libero Ut. Nunc quis et pulvinar magna fermentum wisi quis molestie mauris ac. Risus condimentum vel morbi id ante est pede penatibus tincidunt Pellentesque'+
+    '. Eros pharetra ipsum montes accumsan malesuada ac rhoncus at id vitae. Suspendisse sapien diam id In. '+#10+
+		'Aliquet /orci Nam Nam consequat Nam orci est elit neque et. Nulla ac id pretium auctor scelerisque '+
+    'nunc nunc platea laoreet ornare. Montes turpis lacinia "Phasellus" tempus lacinia laoreet metus arcu tristique orci. Non tellus turpis urna Donec Phasellus et ut justo'+
+    ' adipiscing pharetra. Mauris ridiculus adipiscing justo orci Curabitur Nunc semper eros tristique ipsum. Porttitor hac felis at justo Nulla In Sed tristique mattis. ';
+begin
+  sw := TStopwatch.StartNew;
+  try
+    for i := 0 to CTITERATIONS - 1 do
+    begin
+      sRes := '';
+      sRes := EscapeValue(cTest);
+    end;
+  finally
+    sw.Stop;
+  end;
+
+  iMs1 := sw.ElapsedMilliseconds;
+
+ { sw := TStopwatch.StartNew;
+  try
+    for i := 0 to CTITERATIONS - 1 do
+    begin
+      sRes := '';
+      sRes := EscapeJSONString(cTest);
+    end;
+  finally
+    sw.Stop;
+  end;}
+
+ // iMs2 := sw.ElapsedMilliseconds;
+
+  sw := TStopwatch.StartNew;
+  try
+    for i := 0 to CTITERATIONS - 1 do
+    begin
+      sRes := '';
+      sRes := JSONWideString(cTest);
+    end;
+  finally
+    sw.Stop;
+  end;
+
+  iMs2 := sw.ElapsedMilliseconds;
+
+  Status(Format('1: %D ms. 2: %D ms.3: %D ms.',
+    [iMs1, iMs2, iMs3]));
+
+  CheckTrue(iMs1 < iMs2);
 end;
 
 procedure TestTSvJsonSerializerFactory.TestRemoveObject;
@@ -320,7 +515,7 @@ begin
 
     CheckTrue(FileExists(FILE_SERIALIZE));
 
-   // FSerializer.RemoveObject(KEY_VALUE);
+    FSerializer.RemoveObject(KEY_VALUE);
     CheckTrue(FSerializer.Count = 0);
     //recreate our object to make sure that it's values reset to their initial state
     TestObj.Free;
