@@ -8,6 +8,7 @@
 
 unit uSvStrings;
 
+{$I sv.inc}
 interface
 
 uses
@@ -447,7 +448,10 @@ implementation
 uses
   StrUtils,
   Character,
-  MessageDigest_5,
+  //MessageDigest_5,
+  IdGlobal,
+  idHash,
+  IdHashMessageDigest,
   Types,
   HTTPUtil,
   ZLib
@@ -649,7 +653,7 @@ begin
   strInput:= TStringStream.Create(FValue);
   strOutput:= TStringStream.Create;
   try
-    Zipper:= TZCompressionStream.Create(strOutput, TZCompressionLevel(ACompressionLevel));
+    Zipper:= TZCompressionStream.Create(strOutput, TZCompressionLevel(ACompressionLevel) {$IFDEF DELPHI16_UP}, 128 {$ENDIF});
     try
       Zipper.CopyFrom(strInput, strInput.Size);
     finally
@@ -1118,12 +1122,14 @@ end;
 
 function TSvString.MD5F: string;
 var
-  AMd5: IMD5;
+  AMd5: TIdHashMessageDigest5;
 begin
-  AMd5 := GetMD5;
-  AMd5.Init;
-  AMd5.Update(TByteDynArray(RawByteString(FValue)), System.Length(FValue));
-  Result := LowerCase(AMd5.AsString);
+  AMd5 := TIdHashMessageDigest5.Create;
+  try
+    Result := AMd5.HashStringAsHex(FValue);
+  finally
+    AMd5.Free;
+  end;
 end;
 
 class operator TSvString.NotEqual(const ALeft, ARight: TSvString): Boolean;
