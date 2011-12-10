@@ -170,30 +170,44 @@ type
     /// Deserializes all added objects from the file
     /// </summary>
     /// <param name="AFilename">filename from where to load object's properties</param>
-    procedure DeSerialize(const AFilename: string); overload;
+    procedure DeSerialize(const AFromFilename: string); overload;
     /// <summary>
     /// Deserializes all added objects from the stream
     /// </summary>
     /// <param name="AStream">stream from where to load object's properties</param>
-    procedure DeSerialize(AStream: TStream); overload;
+    procedure DeSerialize(AFromStream: TStream); overload;
+    /// <summary>
+    /// Deserializes all added objects from the string
+    /// </summary>
+    /// <param name="AStream">stream from where to load object's properties</param>
+    procedure DeSerialize(const AFromString: string; const AEncoding: TEncoding); overload;
     /// <summary>
     /// Serializes all added objects to the file
     /// </summary>
     /// <param name="AFilename">filename where to store objects</param>
-    procedure Serialize(const AFilename: string); overload;
+    procedure Serialize(const AToFilename: string); overload;
     /// <summary>
     /// Serializes all added objects to the stream
     /// </summary>
     /// <param name="AStream">stream where to store objects</param>
-    procedure Serialize(AStream: TStream); overload;
+    procedure Serialize(AToStream: TStream); overload;
+    /// <summary>
+    /// Serializes all added objects to the string
+    /// </summary>
+    /// <param name="AStream">stream where to store objects</param>
+    procedure Serialize(var AToString: string; const AEncoding: TEncoding); overload;
     /// <summary>
     ///  Marshalls record's properties into stream
     /// </summary>
-    procedure Marshall<T: record>(const AWhat: T; AStream: TStream); overload;
+    procedure Marshall<T: record>(const AWhat: T; AToStream: TStream); overload;
     /// <summary>
     ///  Marshalls record's properties into file
     /// </summary>
-    procedure Marshall<T: record>(const AWhat: T; const AFilename: string); overload;
+    procedure Marshall<T: record>(const AWhat: T; var AToString: string; const AEncoding: TEncoding); overload;
+    /// <summary>
+    ///  Marshalls record's properties into string
+    /// </summary>
+    procedure Marshall<T: record>(const AWhat: T; const AToFilename: string); overload;
     /// <summary>
     ///  Returns record unmarshalled from stream
     /// </summary>
@@ -202,6 +216,10 @@ type
     ///  Returns record unmarshalled from file
     /// </summary>
     function UnMarshall<T: record>(const AFromFilename: string): T; overload;
+    /// <summary>
+    ///  Returns record unmarshalled from string
+    /// </summary>
+    function UnMarshall<T: record>(const AFromString: string; AEncoding: TEncoding): T; overload;
 
     function GetErrors(): TArray<string>;
 
@@ -350,11 +368,11 @@ begin
   end;
 end;
 
-procedure TSvSerializer.DeSerialize(const AFilename: string);
+procedure TSvSerializer.DeSerialize(const AFromFilename: string);
 var
   fs: TFileStream;
 begin
-  fs := TFileStream.Create(AFilename, fmOpenRead or fmShareDenyNone);
+  fs := TFileStream.Create(AFromFilename, fmOpenRead or fmShareDenyNone);
   try
     DeSerialize(fs);
   finally
@@ -362,10 +380,23 @@ begin
   end;
 end;
 
-procedure TSvSerializer.DeSerialize(AStream: TStream);
+procedure TSvSerializer.DeSerialize(AFromStream: TStream);
 begin
   {DONE -oLinas -cGeneral : deserialize from stream}
-  DoDeSerialize(AStream);
+  DoDeSerialize(AFromStream);
+end;
+
+procedure TSvSerializer.DeSerialize(const AFromString: string;
+  const AEncoding: TEncoding);
+var
+  ss: TStringStream;
+begin
+  ss := TStringStream.Create(AFromString, AEncoding);
+  try
+    DeSerialize(ss);
+  finally
+    ss.Free;
+  end;
 end;
 
 destructor TSvSerializer.Destroy;
@@ -463,7 +494,23 @@ begin
   Result := nil;
 end;
 
-procedure TSvSerializer.Marshall<T>(const AWhat: T; AStream: TStream);
+procedure TSvSerializer.Marshall<T>(const AWhat: T; var AToString: string;
+  const AEncoding: TEncoding);
+var
+  ss: TStringStream;
+begin
+  AToString := '';
+  ss := TStringStream.Create('', AEncoding);
+  try
+    Marshall(AWhat, ss);
+
+    AToString := ss.DataString;
+  finally
+    ss.Free;
+  end;
+end;
+
+procedure TSvSerializer.Marshall<T>(const AWhat: T; AToStream: TStream);
 var
   AVal: TValue;
   arr: TStringDynArray;
@@ -471,18 +518,18 @@ begin
   AVal := TValue.From<T>(AWhat);
   FFactory.BeginSerialization;
   try
-    FFactory.SerializeObject('Main', AVal, AStream, arr);
+    FFactory.SerializeObject('Main', AVal, AToStream, arr);
   finally
     FFactory.EndSerialization;
   end;
 end;
 
 
-procedure TSvSerializer.Marshall<T>(const AWhat: T; const AFilename: string);
+procedure TSvSerializer.Marshall<T>(const AWhat: T; const AToFilename: string);
 var
   fs: TFileStream;
 begin
-  fs := TFileStream.Create(AFilename, fmCreate);
+  fs := TFileStream.Create(AToFilename, fmCreate);
   try
     Marshall<T>(AWhat, fs);
   finally
@@ -522,11 +569,11 @@ begin
   FObjs.Remove(AKey);
 end;
 
-procedure TSvSerializer.Serialize(const AFilename: string);
+procedure TSvSerializer.Serialize(const AToFilename: string);
 var
   fs: TFileStream;
 begin
-  fs := TFileStream.Create(AFilename, fmCreate);
+  fs := TFileStream.Create(AToFilename, fmCreate);
   try
     Serialize(fs);
   finally
@@ -534,10 +581,25 @@ begin
   end;
 end;
 
-procedure TSvSerializer.Serialize(AStream: TStream);
+procedure TSvSerializer.Serialize(AToStream: TStream);
 begin
   {DONE -oLinas -cGeneral : serialize to stream}
-  DoSerialize(AStream);
+  DoSerialize(AToStream);
+end;
+
+procedure TSvSerializer.Serialize(var AToString: string; const AEncoding: TEncoding);
+var
+  ss: TStringStream;
+begin
+  AToString := '';
+  ss := TStringStream.Create('', AEncoding);
+  try
+    Serialize(ss);
+
+    AToString := ss.DataString;
+  finally
+    ss.Free;
+  end;
 end;
 
 procedure TSvSerializer.SetSerializeFormat(const Value: TSvSerializeFormat);
@@ -552,6 +614,19 @@ begin
 end;
 
 
+
+function TSvSerializer.UnMarshall<T>(const AFromString: string;
+  AEncoding: TEncoding): T;
+var
+  ss: TStringStream;
+begin
+  ss := TStringStream.Create(AFromString, AEncoding);
+  try
+    Result := UnMarshall<T>(ss);
+  finally
+    ss.Free;
+  end;
+end;
 
 function TSvSerializer.UnMarshall<T>(AFromStream: TStream): T;
 var

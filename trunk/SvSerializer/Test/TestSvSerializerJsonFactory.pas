@@ -301,36 +301,6 @@ procedure TestTSvJsonSerializerFactory.TestEscapeValue;
     end;
   end;
 
-  function EscapeJSONString(const ws: Ansistring): Ansistring;
-  var
-    i: Integer;
-    wc: WideChar;
-  begin
-    i := 1;
-    result := '"';
-    while i <= length(ws) do begin
-      case ws[i] of
-        '/', '\', '"': result := result + '\' + ws[i];
-        #8: result := result + '\b';
-        #9: result := result + '\t';
-        #10: result := result + '\n';
-        #13: result := result + '\r';
-        #12: result := result + '\f';
-      else if (ord(ws[i]) < 32) then result := result + '\u' + inttohex(ord(ws[i]), 4)
-        else if (ord(ws[i]) > 127)
-        then begin
-          wc := widestring(ws[i])[1];
-          result := result + '\u' + inttohex(ord(PChar(@(wc))[1]), 2) + inttohex(ord(PChar(@(wc))[0]), 2)
-          // '\u' + inttohex(ord(ws[i]), 4)
-        end
-        else result := result + ws[i];
-      end;
-      inc(i);
-    end;
-    result := result + '"';
-  end;
-
-
   function JSONWideString(const ws: String): string;
   var
     C: char;
@@ -358,10 +328,10 @@ var
   sTest, sRes: string;
   sw: TStopwatch;
   i: Integer;
-  iMs1, iMs2, iMs3: Int64;
+  iMs1, iMs2: Int64;
 
 const
-  CTITERATIONS = 100000;
+  CTITERATIONS = 50000;
   cTest: string = 'Lorem ipsum dolor sit amet consectetuer euismod a "sed" adipiscing neque. Pretium ac Donec id facilisi eget sociis Nullam lacinia pharetra Sed. Eu Vivamus Nullam tincidunt malesuada Morbi ac felis mi Praesent lobortis. Lorem Sed tincidunt at interdum '+
     'Aenean metus Curabitur et metus fames. Suscipit Donec nunc adipiscing ligula id elit nonummy a et. '+#10+
 		'Congue Aliquam Nam pede mauris/ laoreet cursus ipsum Praesent congue quis. Vitae cursus ut at orci tellus Aenean Phasellus elit dictumst urna.'+
@@ -390,19 +360,6 @@ begin
 
   iMs1 := sw.ElapsedMilliseconds;
 
- { sw := TStopwatch.StartNew;
-  try
-    for i := 0 to CTITERATIONS - 1 do
-    begin
-      sRes := '';
-      sRes := EscapeJSONString(cTest);
-    end;
-  finally
-    sw.Stop;
-  end;}
-
- // iMs2 := sw.ElapsedMilliseconds;
-
   sw := TStopwatch.StartNew;
   try
     for i := 0 to CTITERATIONS - 1 do
@@ -416,8 +373,8 @@ begin
 
   iMs2 := sw.ElapsedMilliseconds;
 
-  Status(Format('1: %D ms. 2: %D ms.3: %D ms.',
-    [iMs1, iMs2, iMs3]));
+  Status(Format('Iterations: %D. 1: %D ms. 2: %D ms.',
+    [CTITERATIONS, iMs1, iMs2]));
 
   CheckTrue(iMs1 < iMs2);
 end;
@@ -608,9 +565,14 @@ begin
   end;
 end;
 
+const
+  JSON_STRING = '{"TMyRec.Main":{"FString":"Some unicode Português \" Русский/ Ελληνικά","FInt":2147483647}}';
+
 procedure TestTSvJsonSerializerFactory.TestSerializeRecord;
 var
   ARec: TMyRec;
+  FString: TSvString;
+  FJsonString: string;
 begin
   ARec.AString := PROP_STRING;
   ARec.AInt := PROP_INTEGER;
@@ -626,6 +588,14 @@ begin
   CheckEqualsString(PROP_STRING, ARec.AString);
   CheckEquals(PROP_INTEGER, ARec.AInt);
 
+  //test string
+  FString.LoadFromFile('Record.json');
+  CheckTrue(FString <> '');
+  FSerializer.Marshall<TMyRec>(ARec, FJsonString, TEncoding.UTF8);
+  CheckEqualsString(FString, FJsonString);
+  ARec :=  FSerializer.UnMarshall<TMyRec>(FJsonString, TEncoding.UTF8);
+  CheckEqualsString(PROP_STRING, ARec.AString);
+  CheckEquals(PROP_INTEGER, ARec.AInt);
 end;
 
 { TMyRec }
