@@ -101,6 +101,10 @@ type
 
     class operator Add(const ALeft, ARight: TSvString): TSvString; inline;
 
+    class operator Add(const ALeft: TSvString; const ARight: string): TSvString; inline;
+
+    class operator Add(const ALeft: string; const ARight: TSvString): TSvString; inline;
+
     class operator Equal(const ALeft: TSvString; const ARight: TSvString): Boolean; inline;
 
     class operator NotEqual(const ALeft: TSvString; const ARight: TSvString): Boolean; inline;
@@ -586,7 +590,7 @@ end;
 
 class operator TSvString.Add(const ALeft, ARight: TSvString): TSvString;
 begin
-  Result.FValue := ALeft.FValue + ARight.FValue;
+  Result := ALeft.FValue + ARight.FValue;
 end;
 
 procedure TSvString.Concat(const AString: string);
@@ -597,6 +601,16 @@ end;
 procedure TSvString.AddQuotes;
 begin
   FValue := QuotedStr(FValue);
+end;
+
+class operator TSvString.Add(const ALeft: TSvString; const ARight: string): TSvString;
+begin
+  Result.FValue := ALeft.FValue + ARight;
+end;
+
+class operator TSvString.Add(const ALeft: string; const ARight: TSvString): TSvString;
+begin
+  Result.FValue := ALeft + ARight.FValue;
 end;
 
 procedure TSvString.AddQuotes(const AQuote: Char);
