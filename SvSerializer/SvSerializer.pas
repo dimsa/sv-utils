@@ -39,7 +39,7 @@ unit SvSerializer;
 interface
 
 uses
-  SysUtils, Classes, Rtti, Generics.Collections, Types, TypInfo, Strutils;
+  SysUtils, Classes, Rtti, Generics.Collections, Types, TypInfo;
 
 type
   TSvVisibilities = set of TMemberVisibility;
@@ -49,18 +49,16 @@ type
   SvSerialize = class(TCustomAttribute)
   private
     FName: string;
-    FDef: string;
     FGetData : TFunc<TValue, TValue>;
     FSetData : TProc<TValue>;
   public
-    constructor Create(const AName: string = ''; const ADefValue: string = ''); overload;
-    constructor Create(const AName, ADefValue: string; aGetData : TFunc<TValue, TValue>;
-      aSetData : TProc<TValue>); overload;
+    constructor Create(const AName: string = ''); overload;
+    constructor Create(const AName: string; aGetData : TFunc<TValue, TValue>;
+      aSetData : TProc<TValue>); overload; //not implemented yet
 
     property GetData : TFunc<TValue, TValue> read FGetData write FGetData;
     property SetData : TProc<TValue> read FSetData write FSetData;
     property Name: string read FName;
-    property DefValue: string read FDef;
   end;
 
   ESvSerializeException = class(Exception);
@@ -122,7 +120,7 @@ type
     FSerializeFormat: TSvSerializeFormat;
     FFactory: TSvSerializerFactory;
     procedure SetSerializeFormat(const Value: TSvSerializeFormat);
-    function GetObject(const AName: string): TValue;
+    function GetObject(const AName: string): TObject;
     function GetCount: Integer;
     function GetErrorCount: Integer;
   protected
@@ -140,14 +138,14 @@ type
     /// </summary>
     /// <param name="AKey">unique key name which defines where to store object properties</param>
     /// <param name="obj">object to serialize</param>
-    procedure AddObject(const AKey: string; const obj: TValue);
+    procedure AddObject(const AKey: string; const obj: TObject);
     /// <summary>
     /// Adds object and it's named properties which will be used in serialization
     /// </summary>
     /// <param name="AKey">unique key name which defines where to store object properties</param>
     /// <param name="obj">object to serialize</param>
     /// <param name="APropNames">object properties to serialize</param>
-    procedure AddObjectCustomProperties(const AKey: string; const obj: TValue;
+    procedure AddObjectCustomProperties(const AKey: string; const obj: TObject;
       APropNames: array of string);
     /// <summary>
     /// Adds object and all of it's properties in given visibility which will be used in serialization
@@ -155,14 +153,14 @@ type
     /// <param name="AKey">unique key name which defines where to store object properties</param>
     /// <param name="obj">object to serialize</param>
     /// <param name="AVisibilities">Visibilities of properties to serialize</param>
-    procedure AddObjectProperties(const AKey: string; const obj: TValue;
+    procedure AddObjectProperties(const AKey: string; const obj: TObject;
       AVisibilities: TSvVisibilities = [mvPublished]);
     procedure RemoveObject(const AKey: string); overload;
-    procedure RemoveObject(const AObj: TValue); overload;
+    procedure RemoveObject(const AObj: TObject); overload;
     procedure ClearObjects;
 
     property Count: Integer read GetCount;
-    property Objects[const AName: string]: TValue read GetObject; default;
+    property Objects[const AName: string]: TObject read GetObject; default;
 
     class function GetAttribute(AProp: TRttiProperty): SvSerialize;
     class function GetPropertyByName(const APropName: string; ARttiType: TRttiType): TRttiProperty;
@@ -238,36 +236,35 @@ uses
 
 { SvSerialize }
 
-constructor SvSerialize.Create(const  AName, ADefValue: string);
+constructor SvSerialize.Create(const  AName: string);
 begin
-  Create(AName, ADefValue, nil, nil);
+  Create(AName, nil, nil);
 end;
 
-constructor SvSerialize.Create(const AName, ADefValue: string; aGetData: TFunc<TValue, TValue>;
+constructor SvSerialize.Create(const AName: string; aGetData: TFunc<TValue, TValue>;
   aSetData: TProc<TValue>);
 begin
   inherited Create();
   FName := AName;
-  FDef := ADefValue;
   FGetData := aGetData;
   FSetData := aSetData;
 end;
 
 { TSvBaseSerializer }
 
-procedure TSvSerializer.AddObject(const AKey: string; const obj: TValue);
+procedure TSvSerializer.AddObject(const AKey: string; const obj: TObject);
 begin
   AddObjectCustomProperties(AKey, obj, []);
 end;
 
-procedure TSvSerializer.AddObjectCustomProperties(const AKey: string; const obj: TValue;
+procedure TSvSerializer.AddObjectCustomProperties(const AKey: string; const obj: TObject;
   APropNames: array of string);
 var
   APair: TPair<TValue,TStringDynArray>;
   arr: TStringDynArray;
   i: Integer;
 begin
-  if not obj.IsEmpty then
+  if Assigned(obj) then
   begin
     APair.Key := obj;
     SetLength(arr, Length(APropNames));
@@ -281,17 +278,19 @@ begin
   end;
 end;
 
-procedure TSvSerializer.AddObjectProperties(const AKey: string; const obj: TValue; AVisibilities: TSvVisibilities);
+procedure TSvSerializer.AddObjectProperties(const AKey: string; const obj: TObject; AVisibilities: TSvVisibilities);
 var
   rType: TRttiType;
   ACurr: TRttiProperty;
   arr: array of string;
   FStrings: TStringlist;
   i: Integer;
+  AValue: TValue;
 begin
-  if not obj.IsEmpty then
+  if Assigned(obj) then
   begin
-    rType := TSvRttiInfo.GetType(obj);
+    AValue := obj;
+    rType := TSvRttiInfo.GetType(AValue);
     FStrings := TStringList.Create;
     try
       for ACurr in rType.GetProperties do
@@ -339,7 +338,9 @@ begin
 
   case AFormat of
     sstJson: FFactory := TSvJsonSerializerFactory.Create(Self);
+    {$WARNINGS OFF}
     sstXML: FFactory := TSvXMLSerializerFactory.Create(Self);
+    {$WARNINGS ON}
   end;
 end;
 
@@ -470,12 +471,12 @@ begin
   Result := FFactory.FErrors.ToArray;
 end;
 
-function TSvSerializer.GetObject(const AName: string): TValue;
+function TSvSerializer.GetObject(const AName: string): TObject;
 var
   APair: TPair<TValue,TStringDynArray>;
 begin
   if FObjs.TryGetValue(AName, APair) then
-    Result := APair.Key
+    Result := APair.Key.AsObject
   else
     Result := nil;
 end;
@@ -538,23 +539,17 @@ begin
 end;
 
 
-procedure TSvSerializer.RemoveObject(const AObj: TValue);
+procedure TSvSerializer.RemoveObject(const AObj: TObject);
 var
   APair: TPair<string, TPair<TValue,TStringDynArray>>;
   ptrLeft, ptrRight: Pointer;
 begin
+  Assert(Assigned(AObj), 'Cannot remove nil object');
+
   for APair in FObjs do
   begin
-    if AObj.IsObject then
-    begin
-      ptrLeft := AObj.AsObject;
-      ptrRight := APair.Value.Key.AsObject;
-    end
-    else
-    begin
-      ptrLeft := AObj.GetReferenceToRawData;
-      ptrRight := APair.Value.Key.GetReferenceToRawData;
-    end;
+    ptrLeft := AObj;
+    ptrRight := APair.Value.Key.AsObject;
 
     if ptrLeft = ptrRight then
     begin

@@ -13,7 +13,7 @@ interface
 
 uses
   TestFramework, SysUtils, SvSerializer, SvSerializerJsonFactory,
-  Classes, Generics.Collections, Graphics, uSvStrings;
+  Classes, Generics.Collections, Graphics, uSvStrings, DB, MidasLib, DBClient;
 
 type
   TDemoEnum = (deOne, deTwo, deThree);
@@ -41,6 +41,47 @@ type
     property Name: string read GetName write SetName;
   end;
 
+
+  (* say our JQGrid defined as:
+  jQuery("#gridid").jqGrid({
+    ...
+   jsonReader : {
+      root:"invdata",
+      page: "currpage",
+      total: "totalpages",
+      records: "totalrecords",
+      repeatitems: false,
+      id: "0"
+   },
+  ...
+  });
+  *)
+  TJQGridData = class
+  private
+    FTotalPages: Integer;
+    FCurrPage: Integer;
+    FTotalRecords: Integer;
+    FInvData: TClientDataset;
+  public
+    constructor Create(); virtual;
+    destructor Destroy; override;
+
+    procedure FillData();
+    procedure ClearData();
+    function ToJSON(): string;
+    procedure FromJSON(const AJSONString: string);
+
+
+    [SvSerialize('totalpages')]
+    property TotalPages: Integer read FTotalPages write FTotalPages;
+    [SvSerialize('currpage')]
+    property CurrentPage: Integer read FCurrPage write FCurrPage;
+    [SvSerialize('totalrecords')]
+    property TotalRecords: Integer read FTotalRecords write FTotalRecords;
+    [SvSerialize('invdata')]
+    property InvData: TClientDataset read FInvData write FInvData;
+  end;
+
   TDemoObj = class(TInterfacedObject, IDemoObj)
   private
     FName: string;
@@ -62,6 +103,7 @@ type
     FMas2: TArray<TMyRec>;
     FSvString: TSvString;
     FDict: TDictionary<string, TMyRec>;
+    FDataset: TClientDataSet;
     function GetName: string;
     procedure SetName(const Value: string);
   public
@@ -105,6 +147,8 @@ type
     property SvString: TSvString read FSvString write FSvString;
     [SvSerialize]
     property Dict: TDictionary<string, TMyRec> read FDict write FDict;
+    [SvSerialize]
+    property Dataset: TClientDataSet read FDataset write FDataset;
   end;
   // Test methods for class TSvJsonSerializerFactory
 
@@ -122,6 +166,7 @@ type
     procedure TestRemoveObject();
     procedure TestSerializeRecord();
     procedure TestEscapeValue();
+    procedure TestJQGrid();
   end;
 
 implementation
@@ -135,6 +180,27 @@ uses
 
 const
   FILE_SERIALIZE = 'TestSerialize.json';
+
+
+  KEY_VALUE: string = 'Main';
+  KEY_DATASET: string = 'Dataset';
+
+  PROP_STRING = 'Some unicode Português " Русский/ Ελληνικά';
+  PROP_INTEGER : Integer = MaxInt;
+  PROP_DOUBLE: Double = 15865874.1569854;
+  PROP_ENUM: TDemoEnum = deThree;
+  PROP_BOOLEAN: Boolean = True;
+  PROP_COLOR: TColor = clRed;
+  PROP_SET: TNumbers = [deTwo, deThree];
+  PROP_ARRAY: array[0..2] of string = ('1','2','3');
+  PROP_FONTNAME = 'Verdana';
+  PROP_FONTSIZE = 25;
+  COUNT_ARRAY = 3;
+
+  FIELD_STRING = 'NAME';
+  FIELD_INTEGER = 'ID';
+  FIELD_DOUBLE = 'DOUBLE';
+  FIELD_TDATETIME = 'DATETIME';
 
 { TDemoObj }
 
@@ -151,6 +217,13 @@ begin
   FFont := TFont.Create;
   FIntf := nil;
   FDict := TDictionary<string,TMyRec>.Create();
+  FDataset := TClientDataSet.Create(nil);
+  //init dataset
+  FDataset.FieldDefs.Add(FIELD_STRING, ftWideString, 50);
+  FDataset.FieldDefs.Add(FIELD_INTEGER, ftInteger);
+  FDataset.FieldDefs.Add(FIELD_DOUBLE, ftFloat);
+  FDataset.FieldDefs.Add(FIELD_TDATETIME, ftDateTime);
+  FDataset.CreateDataSet;
 end;
 
 destructor TDemoObj.Destroy;
@@ -159,6 +232,7 @@ begin
   FList2.Free;
   FFont.Free;
   FDict.Free;
+  FDataset.Free;
   inherited;
 end;
 
@@ -183,21 +257,6 @@ begin
   FSerializer.Free;
   FSvJsonSerializerFactory := nil;
 end;
-
-const
-  KEY_VALUE: string = 'Main';
-
-  PROP_STRING = 'Some unicode Português " Русский/ Ελληνικά';
-  PROP_INTEGER : Integer = MaxInt;
-  PROP_DOUBLE: Double = 15865874.1569854;
-  PROP_ENUM: TDemoEnum = deThree;
-  PROP_BOOLEAN: Boolean = True;
-  PROP_COLOR: TColor = clRed;
-  PROP_SET: TNumbers = [deTwo, deThree];
-  PROP_ARRAY: array[0..2] of string = ('1','2','3');
-  PROP_FONTNAME = 'Verdana';
-  PROP_FONTSIZE = 25;
-  COUNT_ARRAY = 3;
 
 procedure TestTSvJsonSerializerFactory.TestAddObjectProperties;
 var
@@ -379,6 +438,31 @@ begin
   CheckTrue(iMs1 < iMs2);
 end;
 
+procedure TestTSvJsonSerializerFactory.TestJQGrid;
+var
+  obj: TJQGridData;
+  sJson: TSvString;
+begin
+  obj := TJQGridData.Create;
+  try
+    obj.FillData;
+
+    sJson := obj.ToJSON;
+
+    sJson.SaveToFile('JQGrid.json');
+
+    obj.ClearData;
+
+    CheckEquals(0, obj.InvData.RecordCount);
+
+    obj.FromJSON(sJson);
+
+    CheckEquals(10, obj.InvData.RecordCount);
+  finally
+    obj.Free;
+  end;
+end;
+
 procedure TestTSvJsonSerializerFactory.TestRemoveObject;
 var
   TestObj, TestObj2, temp: TDemoObj;
@@ -395,7 +479,7 @@ begin
 
     CheckEquals(1, FSerializer.Count);
 
-    temp := TDemoObj(FSerializer['Test2'].AsObject);
+    temp := TDemoObj(FSerializer['Test2']);
 
     CheckTrue(temp = TestObj2);
   finally
@@ -461,10 +545,25 @@ begin
     TestObj.Dict.Add('1', ARec2);
    // TestObj.Dict.Add(PROP_STRING, PROP_STRING);
    // TestObj.Dict.Add('1', '111');
+    //TDataset property
+    for i := 1 to 10 do
+    begin
+      TestObj.FDataset.Append;
+
+      TestObj.FDataset.FieldByName(FIELD_STRING).AsString := PROP_STRING;
+      TestObj.FDataset.FieldByName(FIELD_INTEGER).AsInteger := i;
+      TestObj.FDataset.FieldByName(FIELD_DOUBLE).AsFloat := PROP_DOUBLE;
+      TestObj.FDataset.FieldByName(FIELD_TDATETIME).AsDateTime := Today;
+
+      TestObj.FDataset.Post;
+    end;
     {$ENDREGION}
 
 
     ///////////////////////////////////////////
+
+
+  //  FSerializer.AddObject(KEY_DATASET, FDataset);
 
     FSerializer.AddObject(KEY_VALUE, TestObj);
     //serialize to file
@@ -473,6 +572,7 @@ begin
     CheckTrue(FileExists(FILE_SERIALIZE));
 
     FSerializer.RemoveObject(KEY_VALUE);
+   // FSerializer.RemoveObject(KEY_DATASET);
     CheckTrue(FSerializer.Count = 0);
     //recreate our object to make sure that it's values reset to their initial state
     TestObj.Free;
@@ -557,6 +657,21 @@ begin
 
       Inc(i);
     end;
+    //TDataset property
+    CheckEquals(10, TestObj.Dataset.RecordCount);
+    TestObj.Dataset.First;
+
+    i := 1;
+    while not TestObj.Dataset.Eof do
+    begin
+      CheckEqualsString(PROP_STRING, TestObj.Dataset.FieldByName(FIELD_STRING).AsString);
+      CheckEquals(i, TestObj.Dataset.FieldByName(FIELD_INTEGER).AsInteger);
+      CheckEquals(PROP_DOUBLE, TestObj.Dataset.FieldByName(FIELD_DOUBLE).AsFloat);
+      CheckEquals(Today, TestObj.Dataset.FieldByName(FIELD_TDATETIME).AsDateTime);
+
+      TestObj.Dataset.Next;
+      Inc(i);
+    end;
     {$ENDREGION}
 
 
@@ -608,6 +723,86 @@ end;
 procedure TMyRec.SetString(const Value: string);
 begin
   FString := Value;
+end;
+
+{ TJQGridData }
+
+procedure TJQGridData.ClearData;
+begin
+  FInvData.First;
+  while not FInvData.Eof do
+  begin
+    FInvData.Delete;
+  end;
+end;
+
+constructor TJQGridData.Create;
+begin
+  inherited Create();
+  FInvData := TClientDataSet.Create(nil);
+  FInvData.FieldDefs.Add('invid', ftInteger);
+  FInvData.FieldDefs.Add('invdate',ftDateTime);
+  FInvData.FieldDefs.Add('amount',ftFloat);
+  FInvData.FieldDefs.Add('tax',ftInteger);
+  FInvData.FieldDefs.Add('total',ftFloat);
+  FInvData.FieldDefs.Add('note',ftWideString);
+  FInvData.CreateDataSet;
+
+  FTotalPages := 2;
+  FCurrPage := 1;
+  FTotalRecords := 10;
+end;
+
+destructor TJQGridData.Destroy;
+begin
+  FInvData.Free;
+  inherited Destroy;
+end;
+
+procedure TJQGridData.FillData;
+var
+  i: Integer;
+begin
+  for i := 1 to 10 do
+  begin
+    FInvData.Append;
+
+    FInvData.FieldByName('invid').AsInteger := i;
+    FInvData.FieldByName('invdate').AsDateTime := Today;
+    FInvData.FieldByName('amount').AsFloat := i * 100;
+    FInvData.FieldByName('tax').AsInteger := i + 30;
+    FInvData.FieldByName('total').AsFloat := i * 101;
+    FInvData.FieldByName('note').AsString := PROP_STRING;
+
+    FInvData.Post;
+  end;
+end;
+
+procedure TJQGridData.FromJSON(const AJSONString: string);
+var
+  FSer: TSvSerializer;
+begin
+  FSer := TSvSerializer.Create();
+  try
+    FSer.AddObject('', Self);
+    FSer.DeSerialize(AJSONString, TEncoding.UTF8);
+  finally
+    FSer.Free;
+  end;
+end;
+
+function TJQGridData.ToJSON: string;
+var
+  FSer: TSvSerializer;
+begin
+  Result := '';
+  FSer := TSvSerializer.Create();
+  try
+    FSer.AddObject('', Self);
+    FSer.Serialize(Result, TEncoding.UTF8);
+  finally
+    FSer.Free;
+  end;
 end;
 
 initialization

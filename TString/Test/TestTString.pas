@@ -61,11 +61,65 @@ begin
 end;
 
 
+const
+  ADD_COUNT = 100000;
+
 procedure TestTSvString.TestAdd;
+var
+  i: Integer;
+  s, s2: string;
+  i1, i2, i3, i4: Int64;
+  AStr: TSvString;
 begin
   FString := FString + 'z';
 
   Check(FString = cInit + 'z');
+
+  FString := '';
+  sw := TStopwatch.StartNew;
+  for i := 0 to ADD_COUNT - 1 do
+  begin
+    FString := FString + 'a';
+  end;
+
+  sw.Stop;
+  i1 := sw.ElapsedMilliseconds;
+
+  s := '';
+
+  sw := TStopwatch.StartNew;
+  for i := 0 to ADD_COUNT - 1 do
+  begin
+    s := s + 'a';
+  end;
+
+  sw.Stop;
+  i2 := sw.ElapsedMilliseconds;
+
+  AStr := '';
+  sw := TStopwatch.StartNew;
+  for i := 0 to ADD_COUNT - 1 do
+  begin
+    AStr := 'a';
+  end;
+
+  sw.Stop;
+  i3 := sw.ElapsedMilliseconds;
+
+  s2 := '';
+  sw := TStopwatch.StartNew;
+  for i := 0 to ADD_COUNT - 1 do
+  begin
+    s2 := 'a';
+  end;
+
+  sw.Stop;
+  i4 := sw.ElapsedMilliseconds;
+
+  CheckEqualsString(s, FString);
+  Status(Format('TSvString + operator: %D ms. Native string: %D ms. Assign TsvString: %D ms, Native: %D ms.Iterations: %D',
+    [i1, i2, i3, i4,ADD_COUNT]));
+
 end;
 
 procedure TestTSvString.TestClone;
