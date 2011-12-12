@@ -7,3 +7,5 @@
     * [SimpleLoad Simple data loading]
     * [UserFunc User functions]
     * [Encryption Database encryption]
+  * [TSvSerializer TSvSerializer]
+    * [SerializeDataset Dataset serialization]
