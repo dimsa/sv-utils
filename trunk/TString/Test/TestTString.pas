@@ -1,4 +1,4 @@
-unit TestTString;
+﻿unit TestTString;
 {
 
   Delphi DUnit Test Case
@@ -40,6 +40,7 @@ type
     procedure TestJoin;
     procedure TestSplit;
     procedure TestValueOf;
+    procedure TestMD5();
   end;
 
 implementation
@@ -354,6 +355,18 @@ begin
   FString.Decompress;
 
   FString.SaveToFile('SQLiteTable3_decompressed.pas');
+end;
+
+const
+  md5_VALUE = '214dfaa473b74771e7e7dddfd72bdd39';
+
+procedure TestTSvString.TestMD5;
+begin
+  FString := 'somerийandomŠtext12546(83e4h';
+
+  FString.MD5;
+
+  CheckEqualsString(md5_VALUE, FString);
 end;
 
 procedure TestTSvString.TestReplace;
