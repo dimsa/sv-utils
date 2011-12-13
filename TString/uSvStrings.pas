@@ -851,7 +851,7 @@ end;
 
 procedure TSvString.FromBytes(const AValue: TBytes);
 begin
-  FValue := StringOf(AValue);
+  FValue := WideStringOf(AValue);
 end;
 
 procedure TSvString.FromDate(const AValue: TDate);
@@ -1138,9 +1138,9 @@ function TSvString.MD5F: string;
 var
   AMd5: TIdHashMessageDigest5;
 begin
-  AMd5 := TIdHashMessageDigest5.Create;
+  AMd5 := TIdHashMessageDigest5.Create();
   try
-    Result := AMd5.HashStringAsHex(FValue);
+    Result := SysUtils.LowerCase(AMd5.HashStringAsHex(FValue, TEncoding.UTF8));
   finally
     AMd5.Free;
   end;
@@ -1538,7 +1538,7 @@ end;
 
 function TSvString.ToBytes: TBytes;
 begin
-  Result := BytesOf(FValue);
+  Result := WideBytesOf(FValue);
 end;
 
 function TSvString.ToCharArray: TArray<Char>;
