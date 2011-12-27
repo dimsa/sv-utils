@@ -8,15 +8,10 @@ program FetchIntoDataStructureDemo;
 {$R *.res}
 
 uses
-  SQLiteTable3,
-  {$IFDEF DELPHI16_UP}
-  System.SysUtils,
-  System.Generics.Collections;
-  {$ELSE}
   SysUtils,
-  Generics.Collections;
-  {$ENDIF}
-
+  Generics.Collections,
+  SQLite3 in '..\..\Source\SQLite3.pas',
+  SQLiteTable3 in '..\..\Source\SQLiteTable3.pas';
 
 type
   //class must have constructor without arguments

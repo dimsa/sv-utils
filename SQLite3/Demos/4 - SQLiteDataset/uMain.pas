@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, DB, DBClient, Grids, DBGrids, SQLiteTable3, ObjDS, MidasLib, SQLite3Dataset;
+  Dialogs, StdCtrls, DB, DBClient, Grids, DBGrids, SQLiteTable3, MidasLib, ObjDS,
+  SQLite3Dataset;
 
 type
   TMyData = class

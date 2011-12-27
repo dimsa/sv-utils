@@ -8,12 +8,9 @@ program PreparedStatementDemo;
 {$R *.res}
 
 uses
-  SQLiteTable3,
-  {$IFDEF DELPHI16_UP}
-  System.SysUtils;
-  {$ELSE}
-  SysUtils;
-  {$ENDIF}
+  SysUtils,
+  SQLiteTable3 in '..\..\Source\SQLiteTable3.pas',
+  SQLite3 in '..\..\Source\SQLite3.pas';
 
 
 procedure Demo;
