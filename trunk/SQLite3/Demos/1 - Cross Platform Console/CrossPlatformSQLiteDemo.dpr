@@ -1,20 +1,14 @@
-program CrossPlatformSQLiteDemo;
+﻿program CrossPlatformSQLiteDemo;
 
 {$APPTYPE CONSOLE}
 
 {$R *.res}
 
 uses
-  SQLiteTable3,
-  SQLite3,
-  {$IFDEF DELPHI16_UP}
-  System.SysUtils,
-  System.Classes;
-  {$ELSE}
+  SQLite3 in '..\..\Source\SQLite3.pas',
+  SQLiteTable3 in '..\..\Source\SQLiteTable3.pas',
   SysUtils,
   Classes;
-  {$ENDIF}
-
 
 procedure LoadData1();
 var
