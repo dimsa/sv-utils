@@ -777,20 +777,19 @@ begin
 
                   for i := 0 to Length(arrVal)-1 do
                   begin
+                    AJsonValue := TJSONArray(AFrom).Get(i);
+
                     {TODO -oLinas -cGeneral : fix arguments}
-                    arrVal[i] := SetValue(TJSONArray(AFrom).Get(i), AObj, nil, nil, Skip);
+                    arrVal[i] := SetValue(AJsonValue, AObj, nil, AParams[0].ParamType, Skip);
 
 
                     lEnumerator := lEnumMethod.Invoke(AValue, [arrVal[i]]);
                   end;
                 end;
 
-
-
                 Skip := True;
 
               end;
-
 
             end;
           end
