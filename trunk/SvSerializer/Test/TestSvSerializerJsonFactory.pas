@@ -745,7 +745,7 @@ begin
   FInvData.FieldDefs.Add('amount',ftFloat);
   FInvData.FieldDefs.Add('tax',ftInteger);
   FInvData.FieldDefs.Add('total',ftFloat);
-  FInvData.FieldDefs.Add('note',ftWideString);
+  FInvData.FieldDefs.Add('note',ftWideString, 255);
   FInvData.CreateDataSet;
 
   FTotalPages := 2;

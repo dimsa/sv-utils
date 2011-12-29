@@ -99,6 +99,10 @@ type
 
     class operator Implicit(const AValue: Variant): TSvString; inline;
 
+    class operator Explicit(const AString: String): TSvString; inline;
+
+    class operator Explicit(const AString: TSvString): string; inline;
+
     class operator Add(const ALeft, ARight: TSvString): TSvString; inline;
 
     class operator Add(const ALeft: TSvString; const ARight: string): TSvString; inline;
@@ -820,6 +824,16 @@ begin
       Result := False;
     end;
   end;
+end;
+
+class operator TSvString.Explicit(const AString: TSvString): string;
+begin
+  Result := AString.FValue;
+end;
+
+class operator TSvString.Explicit(const AString: String): TSvString;
+begin
+  Result.FValue := AString;
 end;
 
 procedure TSvString.Format(const AFormat: string; const AParams: array of const);
