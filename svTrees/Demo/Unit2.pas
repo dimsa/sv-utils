@@ -32,7 +32,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, CategoryButtons, ExtCtrls, ComCtrls, Contnrs,
-  VirtualTrees, svCollections.GenericTrees, Spin, uVSTSearchEdit;
+  VirtualTrees, svCollections.GenericTrees, Spin;
 
 type
   TTestas = class
@@ -71,10 +71,6 @@ type
     btn6: TButton;
     seCount: TSpinEdit;
     lb1: TLabel;
-    VSTSearchEdit1: TVSTSearchEdit;
-    edFilter: TButtonedEdit;
-    ProgressBar1: TProgressBar;
-    Button1: TButton;
     procedure FormCreate(Sender: TObject);
     procedure BuildDefault(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -92,8 +88,6 @@ type
     procedure btn5Click(Sender: TObject);
     procedure btn6Click(Sender: TObject);
     procedure btn7Click(Sender: TObject);
-    procedure VSTSearchEdit1AfterSearch(ASender: TVSTSearchEdit; ASearchText: string);
-    procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
     sRand: TStringArray;
@@ -114,8 +108,7 @@ implementation
 
 uses
   StrUtils,
-  usvHelpers,
-  Collections.Base;
+  usvHelpers;
 
 {$R *.dfm}
 
@@ -221,11 +214,6 @@ begin
   FData.VirtualTree := vt1;
 end;
 
-procedure TForm1.Button1Click(Sender: TObject);
-begin
-  VSTSearchEdit1.RunSearch;
-end;
-
 procedure TForm1.DoAddIndex(Node: TSVTreeNode<TTestas>);
 begin
 // event on add new child
@@ -269,9 +257,6 @@ begin
   sRand := TStringArray.Create('VIienas', 'kažkas bėga per kelią', 'bla bla bla45',
   'belekas', 'jobtvojmat', 'nu zajac, nu pagady', 'jnebeprisikiškiakopūsteliadamasis',
   'kapiec bus ', '168979464 877846', 'Aefef sfkwoper ', 'asas ORWEUHWsksdmqopdj sdps');
-
-
-  VSTSearchEdit1.Edit := edFilter;
 end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
@@ -298,11 +283,6 @@ end;
 procedure TForm1.Log(const AText: string);
 begin
   Memo1.Lines.Add(AText);
-end;
-
-procedure TForm1.VSTSearchEdit1AfterSearch(ASender: TVSTSearchEdit; ASearchText: string);
-begin
-  Log(ASearchText);
 end;
 
 procedure TForm1.btn2Click(Sender: TObject);
