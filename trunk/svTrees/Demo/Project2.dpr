@@ -6,7 +6,8 @@ program Project2;
 
 uses
   Forms,
-  Unit2 in 'Unit2.pas' {Form1};
+  Unit2 in 'Unit2.pas' {Form1},
+  svCollections.GenericTrees in 'svCollections.GenericTrees.pas';
 
 {$R *.res}
 

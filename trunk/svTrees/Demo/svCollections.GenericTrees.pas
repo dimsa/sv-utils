@@ -28,6 +28,8 @@
 
 unit svCollections.GenericTrees;
 
+{$I sv.inc}
+
 interface
 
 uses
@@ -277,6 +279,12 @@ const
   SVMagicID: TSVMagicID = (#$2045, 'S', 'V', WideChar(SVTreeStreamVersion), ' ', #$2046);
 
 implementation
+
+
+{$IFDEF DELPHI14_UP}
+uses
+  Rtti;
+{$ENDIF}
 
 const
 
@@ -827,6 +835,9 @@ procedure TSVTree<T>.InternalDeleteNode(Node: TSVTreeNode<T>; DoReindex: Boolean
 var
   obj: TObject;
   pTemp: TSVTreeNode<T>;
+  {$IFDEF DELPHI14_UP}
+  AValue: TValue;
+  {$ENDIF}
 begin
   if Assigned(FOnFreeNode) then
     FOnFreeNode(Node)
@@ -834,10 +845,19 @@ begin
   begin
     if FFreeValues then
     begin
+      {$IFDEF DELPHI14_UP}
+      AValue := TValue.From<T>(Node.FValue);
+      if AValue.IsObject then
+      begin
+        obj := AValue.AsObject;
+        if Assigned(obj) then
+          obj.Free;
+      end;
+      {$ELSE}
       obj := TObject(Node.FValue);
-     // obj := @(Node.FValue)^;
       if Assigned(obj) then
         obj.Free;
+      {$ENDIF}
     end;
   end;
 
