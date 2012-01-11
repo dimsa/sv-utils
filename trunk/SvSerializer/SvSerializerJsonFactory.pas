@@ -553,7 +553,7 @@ var
   sVal: string;
   arrVal: array of TValue;
   rType: TRttiType;
-  lEnumMethod : TRttiMethod;
+  lEnumMethod, lCreateMethod : TRttiMethod;
   lEnumerator, AValue : TValue;
   lClearMethod : TRttiMethod;
   FField: TRttiField ;
@@ -565,8 +565,11 @@ var
   ADst: TDataSet;
   jArr: TJSONArray;
   fld: TField;
+  bCreated: Boolean;
 begin
   Skip := False;
+  bCreated := False;
+  AValue := TValue.Empty;
   if Assigned(AFrom) then
   begin
     if AFrom is TJSONNumber then
@@ -719,13 +722,30 @@ begin
                   end;
 
                 end;
+              end
+              else
+              begin
+                //if AProp not assigned then we must create it
+                if rType.IsInstance then
+                begin
+                  for lCreateMethod in rType.GetMethods do
+                  begin
+                    if lCreateMethod.IsConstructor and (System.Length(lCreateMethod.GetParameters)=0) then
+                    begin
+                      AValue := lCreateMethod.Invoke(rType.AsInstance.MetaclassType, []);
+                      bCreated := True;
+                      Break;
+                    end;
+                  end;
+                end;
+
               end;
 
-
               lEnumMethod := TSvRttiInfo.GetBasicMethod('Add', rType);
-              if Assigned(lEnumMethod) and Assigned(AProp) then
+              if Assigned(lEnumMethod) and ( (Assigned(AProp)) or not (AValue.IsEmpty)  ) then
               begin
-                AValue := TSvRttiInfo.GetValue(AProp, AObj);
+                if AValue.IsEmpty and Assigned(AProp) then
+                  AValue := TSvRttiInfo.GetValue(AProp, AObj);
                // AValue := AProp.GetValue(AObj);
                 lClearMethod := TSvRttiInfo.GetBasicMethod('Clear', rType);
                 if Assigned(lClearMethod) and (Length(lClearMethod.GetParameters) = 0) then
@@ -780,11 +800,17 @@ begin
                     AJsonValue := TJSONArray(AFrom).Get(i);
 
                     {TODO -oLinas -cGeneral : fix arguments}
+
                     arrVal[i] := SetValue(AJsonValue, AObj, nil, AParams[0].ParamType, Skip);
 
 
                     lEnumerator := lEnumMethod.Invoke(AValue, [arrVal[i]]);
                   end;
+                end;
+
+                if bCreated then
+                begin
+                  Result := AValue;
                 end;
 
                 Skip := True;
