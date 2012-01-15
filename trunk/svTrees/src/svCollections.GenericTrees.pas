@@ -1537,7 +1537,7 @@ function TSVBaseVirtualTreeHelper.GenerateIndex(
 var
   pNode: PVirtualNode;
 begin
-  Result := EmptyAnsiStr;
+  Result := '';
   if Assigned(Node) then
   begin
     Result := RawByteString(IntToStr(Node.Index));
