@@ -876,13 +876,13 @@ end;
 const
   //default supported column types defined in sqlite db
   // each other type which isn't supported is bound as text column
-  DEF_COLCOUNT = 9;
+  DEF_COLCOUNT = 10;
   DEF_COLTYPES_NAMES : array[0..DEF_COLCOUNT-1] of string =
-    ('INTEGER', 'BOOLEAN', 'NUMERIC', 'FLOAT', 'DOUBLE', 'REAL',
+    ('SMALLINT', 'INTEGER', 'BOOLEAN', 'NUMERIC', 'FLOAT', 'DOUBLE', 'REAL',
      'DATETIME', 'DATE', 'BLOB'
     );
   DEF_COLTYPES : array[0..DEF_COLCOUNT-1] of Integer =
-    (dtInt, dtInt, dtNumeric, dtNumeric, dtNumeric, dtNumeric,
+    (dtInt, dtInt, dtInt, dtNumeric, dtNumeric, dtNumeric, dtNumeric,
      dtDateTime, dtDate, dtBlob
     );
 
