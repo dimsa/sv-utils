@@ -30,7 +30,7 @@ unit SvDesignPatterns;
 interface
 
 uses
-  SysUtils, Generics.Collections;
+  SysUtils, Generics.Collections, Rtti;
 
 type
   EFactoryMethodKeyAlreadyRegisteredException = class(Exception);
@@ -42,69 +42,235 @@ type
   TFactoryMethod<TBaseType> = reference to function: TBaseType;
 
   /// <summary>
-  /// Factory method class
+  /// Abstract factory class
   /// </summary>
-  TFactory<TKey, TBaseType> = class
+  TAbstractFactory<TKey, TBaseType> = class abstract
   strict private
     type
       TFactoryEnumerator = class(TEnumerator<TPair<TKey,TBaseType>>)
       private
+        FFactory: TAbstractFactory<TKey, TBaseType>;
         FEnum: TEnumerator<TPair<TKey,TFactoryMethod<TBaseType>>>;
         function GetCurrent: TPair<TKey,TBaseType>;
       protected
         function DoGetCurrent: TPair<TKey,TBaseType>; override;
         function DoMoveNext: Boolean; override;
       public
-        constructor Create(AEnum: TEnumerator<TPair<TKey,TFactoryMethod<TBaseType>>>);
+        constructor Create(AFactory: TAbstractFactory<TKey, TBaseType>);
         destructor Destroy; override;
 
         property Current: TPair<TKey,TBaseType> read GetCurrent;
         function MoveNext: Boolean;
       end;
-
   private
     FFactoryMethods: TDictionary<TKey, TFactoryMethod<TBaseType>>;
     function GetCount: Integer;
   public
-    constructor Create;
+    constructor Create; virtual;
     destructor Destroy; override;
+  
+    /// <summary>
+    /// Registers new factory method. If AFactoryMethod is nil, factory will use 
+    ///   parameterless constructor
+    /// </summary>
+    /// <param name="AKey">Key to identify the element</param>
+    /// <param name="AFactoryMethod">Anonymous method which returns the correct element</param>
+    procedure RegisterFactoryMethod(const AKey: TKey; AFactoryMethod: TFactoryMethod<TBaseType>); virtual;
+    procedure UnregisterFactoryMethod(const AKey: TKey); virtual;
+    procedure UnregisterAll(); virtual;
+    function IsRegistered(const AKey: TKey): Boolean; virtual;
 
-    property Count: Integer read GetCount;
-    procedure RegisterFactoryMethod(const AKey: TKey; AFactoryMethod: TFactoryMethod<TBaseType>);
-    procedure UnregisterFactoryMethod(const AKey: TKey);
-    procedure UnregisterAll();
-    function IsRegistered(const AKey: TKey): Boolean;
-    function GetInstance(const AKey: TKey): TBaseType;
-
+    class function CreateElement(): TBaseType;
+    
     function GetEnumerator: TFactoryEnumerator;
+  protected
+    function GetInstance(const AKey: TKey): TBaseType; virtual; abstract;
+  public
+    /// <summary>
+    /// Count of registered factory methods
+    /// </summary>
+    property Count: Integer read GetCount;
+  end;
+  
+  /// <summary>
+  /// Factory method class
+  /// </summary>
+  TFactory<TKey, TBaseType> = class(TAbstractFactory<TKey, TBaseType>)
+  public
+    constructor Create; override;
+    destructor Destroy; override;
+    /// <summary>
+    /// Gets instance of TBaseType
+    /// </summary>
+    /// <remarks>
+    /// AFactoryMethod will be invoked on each and every instance retrieval. 
+    /// </remarks>
+    /// <param name="AKey">Key of an element</param>
+    /// <returns>Instance of TBaseType</returns>
+    function GetInstance(const AKey: TKey): TBaseType; override;
   end;
 
+  /// <summary>
+  /// Multiton pattern. 
+  /// </summary>
+  TMultiton<TKey, TBaseType> = class(TAbstractFactory<TKey, TBaseType>)
+  private
+    FLifetimeWatcher: TDictionary<TKey,TValue>;
+    FOwnsObjects: Boolean;
+
+    procedure ClearObject(const AValue: TValue);
+    procedure ClearObjects();
+  public
+    constructor Create(AOwnsObjects: Boolean = False); reintroduce; overload; 
+    destructor Destroy; override;
+    /// <summary>
+    /// Registers new factory method. If AFactoryMethod is nil, factory will use an instance created 
+    /// with parameterless constructor
+    /// </summary>
+    /// <param name="AKey">Key to identify the element</param>
+    /// <param name="AFactoryMethod">Anonymous method which returns the correct element</param>
+    procedure RegisterFactoryMethod(const AKey: TKey; AFactoryMethod: TFactoryMethod<TBaseType>); override;
+    procedure UnregisterFactoryMethod(const AKey: TKey); override;
+    procedure UnregisterAll(); override;
+    /// <summary>
+    /// Gets instance of TBaseType
+    /// </summary>
+    /// <remarks>
+    /// AFactoryMethod will be invoked only on first instance retrieval. Further retrievals 
+    ///  will return the same instance as it was returned in AFactoryMethod
+    /// </remarks>
+    /// <param name="AKey">Key of an element</param>
+    /// <returns>Instance of TBaseType</returns>
+    function GetInstance(const AKey: TKey): TBaseType; override;
+    /// <summary>
+    /// If multiton owns object , it will try to free them.
+    /// </summary>
+    property OwnsObjects: Boolean read FOwnsObjects write FOwnsObjects;
+  end;
 
 implementation
 
+{ TAbstractFactory<TKey, TBaseType> }
+
+constructor TAbstractFactory<TKey, TBaseType>.Create;
+begin
+  inherited Create();
+  FFactoryMethods := TDictionary<TKey, TFactoryMethod<TBaseType>>.Create();
+end;
+
+class function TAbstractFactory<TKey, TBaseType>.CreateElement: TBaseType;
+var
+  rType: TRttiType;
+  AMethCreate: TRttiMethod;
+  instanceType: TRttiInstanceType;
+begin
+  rType := TRttiContext.Create.GetType(TypeInfo(TBaseType));
+  if rType.IsInstance then
+  begin
+    for AMethCreate in rType.GetMethods do
+    begin
+      if (AMethCreate.IsConstructor) and (Length(AMethCreate.GetParameters) = 0) then
+      begin
+        instanceType := rType.AsInstance;
+
+        Result := AMethCreate.Invoke(instanceType.MetaclassType, []).AsType<TBaseType>;
+
+        Break;
+      end;
+    end;
+  end;
+end;
+
+destructor TAbstractFactory<TKey, TBaseType>.Destroy;
+begin
+  FFactoryMethods.Free;
+  inherited Destroy;
+end;
+
+function TAbstractFactory<TKey, TBaseType>.GetCount: Integer;
+begin
+  Result := FFactoryMethods.Count;
+end;
+
+function TAbstractFactory<TKey, TBaseType>.GetEnumerator: TFactoryEnumerator;
+begin
+  Result := TFactoryEnumerator.Create(Self);
+end;
+
+function TAbstractFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;
+begin
+  Result := FFactoryMethods.ContainsKey(AKey);
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.RegisterFactoryMethod(const AKey: TKey;
+  AFactoryMethod: TFactoryMethod<TBaseType>);
+begin
+  if IsRegistered(AKey) then
+    raise TFactoryMethodKeyAlreadyRegisteredException.Create('Factory already registered');
+
+  FFactoryMethods.Add(AKey, AFactoryMethod);
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.UnregisterAll;
+begin
+  FFactoryMethods.Clear;
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.UnregisterFactoryMethod(const AKey: TKey);
+begin
+  if not IsRegistered(AKey) then
+    raise TFactoryMethodKeyNotRegisteredException.Create('Factory not registered');
+
+  FFactoryMethods.Remove(AKey);
+end;
+
+{ TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator }
+
+constructor TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator.Create(
+  AFactory: TAbstractFactory<TKey, TBaseType>);
+begin
+  inherited Create();
+  FFactory := AFactory;
+  FEnum := FFactory.FFactoryMethods.GetEnumerator;
+end;
+
+destructor TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator.Destroy;
+begin
+  FEnum.Free;
+  inherited Destroy;
+end;
+
+function TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator.DoGetCurrent: TPair<TKey, TBaseType>;
+begin
+  Result := GetCurrent;
+end;
+
+function TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator.DoMoveNext: Boolean;
+begin
+  Result := MoveNext;
+end;
+
+function TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator.GetCurrent: TPair<TKey, TBaseType>;
+begin
+  Result.Key := FEnum.Current.Key;
+  Result.Value := FFactory.GetInstance(Result.Key);
+end;
+
+function TAbstractFactory<TKey, TBaseType>.TFactoryEnumerator.MoveNext: Boolean;
+begin
+  Result := FEnum.MoveNext;
+end;
 
 { TFactory<TKey, TBaseType> }
 
 constructor TFactory<TKey, TBaseType>.Create;
 begin
   inherited Create();
-  FFactoryMethods := TDictionary<TKey, TFactoryMethod<TBaseType>>.Create();
 end;
 
 destructor TFactory<TKey, TBaseType>.Destroy;
 begin
-  FFactoryMethods.Free;
   inherited Destroy;
-end;
-
-function TFactory<TKey, TBaseType>.GetCount: Integer;
-begin
-  Result := FFactoryMethods.Count;
-end;
-
-function TFactory<TKey, TBaseType>.GetEnumerator: TFactoryEnumerator;
-begin
-  Result := TFactoryEnumerator.Create(FFactoryMethods.GetEnumerator);
 end;
 
 function TFactory<TKey, TBaseType>.GetInstance(const AKey: TKey): TBaseType;
@@ -115,73 +281,102 @@ begin
     raise TFactoryMethodKeyNotRegisteredException.Create('Factory not registered');
   factoryMethod := fFactoryMethods.Items[AKey];
   if Assigned(factoryMethod) then
-    Result := factoryMethod;
+    Result := factoryMethod
+  else
+    Result := CreateElement;
 end;
 
-function TFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;
+{ TMultiton<TKey, TBaseType> }
+
+procedure TMultiton<TKey, TBaseType>.ClearObject(const AValue: TValue);
+var
+  obj: TObject;
 begin
-  Result := FFactoryMethods.ContainsKey(AKey);
+  if not (AValue.IsEmpty) and (AValue.IsObject) then
+  begin
+    obj := AValue.AsObject;
+    if Assigned(obj) then
+      obj.Free;
+  end;
 end;
 
-procedure TFactory<TKey, TBaseType>.RegisterFactoryMethod(const AKey: TKey; AFactoryMethod: TFactoryMethod<TBaseType>);
+procedure TMultiton<TKey, TBaseType>.ClearObjects;
+var
+  pair: TPair<TKey,TValue>;
 begin
-  if IsRegistered(AKey) then
-    raise TFactoryMethodKeyAlreadyRegisteredException.Create('Factory already registered');
-
-  fFactoryMethods.Add(AKey, AFactoryMethod);
+  if FOwnsObjects then
+  begin
+    for pair in FLifetimeWatcher do
+    begin
+      ClearObject(pair.Value);
+    end;
+  end;
 end;
 
-procedure TFactory<TKey, TBaseType>.UnregisterAll;
+constructor TMultiton<TKey, TBaseType>.Create(AOwnsObjects: Boolean);
 begin
-  FFactoryMethods.Clear;
+  inherited Create();
+  FLifetimeWatcher := TDictionary<TKey,Rtti.TValue>.Create; 
+  FOwnsObjects := AOwnsObjects;
 end;
 
-procedure TFactory<TKey, TBaseType>.UnregisterFactoryMethod(const AKey: TKey);
+destructor TMultiton<TKey, TBaseType>.Destroy;
+begin
+  ClearObjects;
+  FLifetimeWatcher.Free;
+  inherited;
+end;
+
+function TMultiton<TKey, TBaseType>.GetInstance(const AKey: TKey): TBaseType;
+var
+  factoryMethod: TFactoryMethod<TBaseType>;
+  AValue: TValue;
 begin
   if not IsRegistered(AKey) then
     raise TFactoryMethodKeyNotRegisteredException.Create('Factory not registered');
 
-  FFactoryMethods.Remove(AKey);
+  AValue := FLifetimeWatcher.Items[AKey];
+  if AValue.IsEmpty then
+  begin
+    factoryMethod := fFactoryMethods.Items[AKey];
+    if Assigned(factoryMethod) then
+      Result := factoryMethod     
+    else
+      Result := CreateElement;
+    AValue := TValue.From<TBaseType>(Result);
+    FLifetimeWatcher.AddOrSetValue(AKey, AValue);
+  end
+  else
+  begin
+    Result := AValue.AsType<TBaseType>;
+  end;
 end;
 
-{ TFactory<TKey, TBaseType>.TFactoryEnumerator }
-
-constructor TFactory<TKey, TBaseType>.TFactoryEnumerator.Create(
-  AEnum: TEnumerator<TPair<TKey, TFactoryMethod<TBaseType>>>);
+procedure TMultiton<TKey, TBaseType>.RegisterFactoryMethod(const AKey: TKey;
+  AFactoryMethod: TFactoryMethod<TBaseType>);
 begin
-  inherited Create();
-  FEnum := AEnum;
+  inherited;
+  FLifetimeWatcher.Add(AKey, TValue.Empty);
 end;
 
-destructor TFactory<TKey, TBaseType>.TFactoryEnumerator.Destroy;
+procedure TMultiton<TKey, TBaseType>.UnregisterAll;
 begin
-  FEnum.Free;
-  inherited Destroy;
+  inherited;
+  ClearObjects;
+  FLifetimeWatcher.Clear;
 end;
 
-function TFactory<TKey, TBaseType>.TFactoryEnumerator.DoGetCurrent: TPair<TKey,TBaseType>;
-begin
-  Result := GetCurrent;
-end;
-
-function TFactory<TKey, TBaseType>.TFactoryEnumerator.DoMoveNext: Boolean;
-begin
-  Result := MoveNext;
-end;
-
-function TFactory<TKey, TBaseType>.TFactoryEnumerator.GetCurrent: TPair<TKey,TBaseType>;
+procedure TMultiton<TKey, TBaseType>.UnregisterFactoryMethod(const AKey: TKey);
 var
-  factoryMethod: TFactoryMethod<TBaseType>;
+  AValue: TValue;
 begin
-  Result.Key := FEnum.Current.Key;
-  factoryMethod := FEnum.Current.Value;
-  if Assigned(factoryMethod) then
-    Result.Value := factoryMethod;
-end;
-
-function TFactory<TKey, TBaseType>.TFactoryEnumerator.MoveNext: Boolean;
-begin
-  Result := FEnum.MoveNext;
+  inherited;
+  if FOwnsObjects then
+  begin
+    AValue := FLifetimeWatcher.Items[AKey];
+    ClearObject(AValue);                    
+  end;
+  FLifetimeWatcher.Remove(AKey);
 end;
 
 end.

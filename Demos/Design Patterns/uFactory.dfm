@@ -45,7 +45,6 @@ object frmUI: TfrmUI
     Anchors = [akLeft, akTop, akRight, akBottom]
     ScrollBars = ssBoth
     TabOrder = 2
-    ExplicitWidth = 267
   end
   object btn2: TButton
     Left = 16

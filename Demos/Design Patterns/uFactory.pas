@@ -63,6 +63,8 @@ type
   private
     { Private declarations }
     Factory: TFactory<TDemoEnum,IDemo>;
+    Multiton: TMultiton<TDemoEnum,IDemo>;
+    ManagedMultiton: TMultiton<TDemoEnum,TDemo>;
     ButtonFactory: TFactory<string,TButton>;
 
     procedure FillItems();
@@ -127,6 +129,12 @@ begin
 end;
 
 procedure TfrmUI.FormCreate(Sender: TObject);
+var
+  i: Integer;
+  obj: IDemo;
+  obj2: TDemo;
+  pair: TPair<TDemoEnum,IDemo>;
+  pair2: TPair<TDemoEnum,TDemo>;
 begin
   Factory := TFactory<TDemoEnum,IDemo>.Create;
 
@@ -148,6 +156,63 @@ begin
       Result := TDemo.Create(feThree);
     end);
 
+  Multiton := TMultiton<TDemoEnum,IDemo>.Create;
+
+  Multiton.RegisterFactoryMethod(feOne,
+    function: IDemo
+    begin
+      Result := TDemo.Create(feOne);
+    end);
+
+  Multiton.RegisterFactoryMethod(feTwo,
+    function: IDemo
+    begin
+      Result := TDemo.Create(feTwo);
+    end);
+
+  Multiton.RegisterFactoryMethod(feThree,
+    function: IDemo
+    begin
+      Result := TDemo.Create(feThree);
+    end);
+
+  //get instance 10 times. Multiton will call factory method only first time
+  for i := 1 to 10 do
+  begin
+    obj := Multiton.GetInstance(feOne);
+  end;
+  //test foreach loop
+  for pair in Multiton do
+  begin
+    obj := pair.Value;
+  end;
+
+  ManagedMultiton := TMultiton<TDemoEnum,TDemo>.Create(True);
+  ManagedMultiton.RegisterFactoryMethod(feOne,
+    function: TDemo
+    begin
+      Result := TDemo.Create(feOne);
+    end);
+
+  ManagedMultiton.RegisterFactoryMethod(feTwo,
+    function: TDemo
+    begin
+      Result := TDemo.Create(feTwo);
+    end);
+  ManagedMultiton.RegisterFactoryMethod(feThree,
+    function: TDemo
+    begin
+      Result := TDemo.Create(feThree);
+    end);
+
+  //test foreach loop
+  for pair2 in ManagedMultiton do
+  begin
+    obj2 := nil;
+    obj2 := pair2.Value;
+    Assert(Assigned(obj2));
+  end;
+
   FillItems();
 
   ButtonFactory := TFactory<string,TButton>.Create;
@@ -164,6 +229,8 @@ procedure TfrmUI.FormDestroy(Sender: TObject);
 begin
   Factory.Free;
   ButtonFactory.Free;
+  Multiton.Free;
+  ManagedMultiton.Free;
 end;
 
 { TDemo }
