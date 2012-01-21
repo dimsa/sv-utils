@@ -38,6 +38,8 @@ type
     class function InitCustomPath(const APath: string): TPathBuilder; static;
   end;
 
+
+  ESvEnumException = class(Exception);
   /// <summary>
   /// Generic enumeration type
   /// <remarks>
@@ -147,7 +149,9 @@ var
 begin
   AValue := TValue.From<T>(Value);
   if AValue.Kind = tkEnumeration then
-    FValue := AValue.AsOrdinal;
+    FValue := AValue.AsOrdinal
+  else
+    raise ESvEnumException.Create('Incorrect value type. Can set only enumerations.');
 end;
 
 function TSvEnum<T>.ToString: string;
