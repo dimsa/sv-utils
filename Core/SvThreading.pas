@@ -34,6 +34,8 @@ uses
   SysUtils, Classes;
 
 type
+  ESvFuturesException = class(Exception);
+
   ISvFuture = interface
     function Canceled: Boolean;
     function Finished: Boolean;
@@ -86,7 +88,25 @@ type
 
     function Value: T;
   end;
-
+{$REGION 'Doc'}
+    /// <summary>
+    /// Future value
+    /// </summary>
+    /// <remarks>
+    /// Contains any type value which will be calculated in the separate thread
+    ///  Waits for the thread to finish when getting value if it's not already finished
+    /// </remarks>
+    /// <code>
+    /// var vFuture: TSvFuture<Integer>;
+    ///     intValue: Integer;
+    ///  begin
+    ///  vFuture.Assign(function: Integer begin Result := 10 * 1024; Sleep(1000); end);
+    ///  //now main thread doesn't stop, because calculation executes in separate thread
+    ///  //do something...
+    ///  //when you need value just get it
+    ///  intValue := vFuture; //intValue = 10240. If vFuture value isn't calculated yet, it waits for this to finish
+    /// </code>
+{$ENDREGION}
   TSvFuture<T> = record
   private
     FFuture: ISvFuture<T>;
@@ -96,6 +116,7 @@ type
     function GetFinished: Boolean;
   public
     constructor Create(const AFunc: TFunc<T>);
+    procedure Assign(const AFunc: TFunc<T>);
 
     procedure Cancel;
     procedure WaitFor;
@@ -142,6 +163,11 @@ begin
   Result := AFuture.Value;
 end;
 
+procedure TSvFuture<T>.Assign(const AFunc: TFunc<T>);
+begin
+  Create(AFunc);
+end;
+
 class operator TSvFuture<T>.Implicit(const AFunc: TFunc<T>): TSvFuture<T>;
 begin
   Result := TSvFuture<T>.Create(AFunc);
@@ -161,14 +187,14 @@ end;
 
 destructor TSvAbstractFuture.Destroy;
 begin
-  FreeAndNil(FWorker);
-  inherited;
+  FWorker.Free;
+  inherited Destroy;
 end;
 
 procedure TSvAbstractFuture.Cancel;
 begin
   if FCanceled then
-    raise Exception.Create('Action already canceled');
+    raise ESvFuturesException.Create('Action already canceled');
 
   if not FWorker.Finished then
   begin
@@ -206,7 +232,7 @@ begin
     Terminate;
     WaitFor;
   end;
-  inherited;
+  inherited Destroy;
 end;
 
 procedure TSvAbstractFutureThread.DoTerminate;
@@ -240,7 +266,7 @@ end;
 function TFutureType<T>.Value: T;
 begin
   if FCanceled then
-    raise Exception.Create('Action was canceled');
+    raise ESvFuturesException.Create('Action was canceled');
 
   if not FWorker.Finished then
   begin
