@@ -31,7 +31,7 @@ unit SvThreading;
 interface
 
 uses
-  SysUtils, Classes;
+  SysUtils, Classes, SyncObjs, Generics.Collections;
 
 type
   ESvFuturesException = class(Exception);
@@ -127,6 +127,147 @@ type
     property Canceled: Boolean read GetCanceled;
     property Finished: Boolean read GetFinished;
     property Value: T read GetValue;
+  end;
+
+ // TParallelProc1 = reference to procedure(const i: NativeInt; var Abort: Boolean);
+  TParallelFunc1 = reference to procedure(const i: NativeInt; var Abort: Boolean);
+  TParallelFunc2 = reference to procedure(const i, AThreadIndex: NativeInt; var Abort: Boolean);
+
+  TParallelMode = (pmBlocking, pmNonBlocking);
+
+  TSvThreadPool = class;
+
+  TSvParallelThread = class(TThread)
+  private
+    FThreadIndex: NativeInt;
+    FOwner: TSvThreadPool;
+    FFreePool: Boolean;
+  protected
+    procedure DoTerminate; override;
+    procedure Execute; override;
+  public
+    constructor Create(AOwner: TSvThreadPool); reintroduce;
+    destructor Destroy; override;
+
+    property FreePool: Boolean read FFreePool write FFreePool;
+  end;
+
+  ISvThreadPool = interface
+  ['{AA2B2700-659B-4DEE-BBBC-62B28C7D2431}']
+    //getters and setters
+    function GetAbort: Boolean;
+    procedure SetAbort(const Value: Boolean);
+    function GetMaxPos: NativeInt;
+    procedure SetMaxPos(const Value: NativeInt);
+    function GetCurrPos: NativeInt;
+    procedure SetCurrPos(const Value: NativeInt);
+    function GetMaxThreads: Integer;
+    procedure SetMaxThreads(const Value: Integer);
+    function GetProc1: TParallelFunc1;
+    procedure SetProc1(const Value: TParallelFunc1);
+    function GetProc2: TParallelFunc2;
+    procedure SetProc2(const Value: TParallelFunc2);
+    function GetMode: TParallelMode;
+    procedure SetMode(const Value: TParallelMode);
+    //methods
+    function Add(const AThreadIndex: NativeInt): Integer;
+    procedure Start();
+    procedure Terminate();
+    procedure WaitFor(AExceptIndex: NativeInt);
+    //properties
+    property Abort: Boolean read GetAbort write SetAbort;
+    property CurrPos: NativeInt read GetCurrPos write SetCurrPos;
+    property MaxPos: NativeInt read GetMaxPos write SetMaxPos;
+    property MaxThreads: Integer read GetMaxThreads write SetMaxThreads;
+    property Mode: TParallelMode read GetMode write SetMode;
+    property Proc1: TParallelFunc1 read GetProc1 write SetProc1;
+    property Proc2: TParallelFunc2 read GetProc2 write SetProc2;
+  end;
+
+  TSvThreadPool = class(TInterfacedObject, ISvThreadPool)
+  private
+    FCSection: TCriticalSection;
+    FMaxThreads: Integer;
+    FCurrPos: NativeInt; //current loop index
+    FMaxPos: NativeInt;
+    FAbort: Boolean;
+    FThreads: TObjectList<TSvParallelThread>;
+    FProc1: TParallelFunc1;
+    FProc2: TParallelFunc2;
+    FFinishProc: TThreadProcedure;
+    FMode: TParallelMode;
+    function GetThread(const AIndex: Integer): TSvParallelThread;
+    function GetAbort: Boolean;
+    procedure SetAbort(const Value: Boolean);
+    function GetMaxPos: NativeInt;
+    procedure SetMaxPos(const Value: NativeInt);
+    function GetCurrPos: NativeInt;
+    procedure SetCurrPos(const Value: NativeInt);
+    function GetMaxThreads: Integer;
+    procedure SetMaxThreads(const Value: Integer);
+    function GetProc1: TParallelFunc1;
+    procedure SetProc1(const Value: TParallelFunc1);
+    function GetProc2: TParallelFunc2;
+    procedure SetProc2(const Value: TParallelFunc2);
+    function GetMode: TParallelMode;
+    procedure SetMode(const Value: TParallelMode);
+  protected
+    function GetNextValue: NativeInt;
+    procedure SetDontFreeFlag(AValue: Boolean);
+  public
+    constructor Create(); virtual;
+    destructor Destroy; override;
+
+    function Add(const AThreadIndex: NativeInt): Integer;
+    procedure Start();
+    procedure Terminate();
+    procedure WaitFor(AExceptIndex: NativeInt = -1);
+    procedure Release(AExceptIndex: NativeInt = -1);
+
+
+    property Thread[const AIndex: Integer]: TSvParallelThread read GetThread; default;
+    property Threads: TObjectList<TSvParallelThread> read FThreads;
+
+    property Abort: Boolean read GetAbort write SetAbort;
+    property CurrPos: NativeInt read GetCurrPos write SetCurrPos;
+    property MaxPos: NativeInt read GetMaxPos write SetMaxPos;
+    property MaxThreads: Integer read GetMaxThreads write SetMaxThreads;
+    property Mode: TParallelMode read GetMode write SetMode;
+
+    property Proc1: TParallelFunc1 read GetProc1 write SetProc1;
+    property Proc2: TParallelFunc2 read GetProc2 write SetProc2;
+  end;
+  /// <summary>
+  /// Parallel loop implementation
+  /// </summary>
+  TSvParallel = class sealed
+  private
+    class var
+      FMaxThreads: Integer;
+  private
+    class constructor Create;
+    class destructor Destroy;
+
+    class procedure DoForEach(const AFrom, ATo: NativeInt; AFunc1: TParallelFunc1;
+      AFunc2: TParallelFunc2; AOnAllFinishProc: TThreadProcedure; AMode: TParallelMode);
+  public
+    class procedure ForEach(const AFrom, ATo: NativeInt; AFunc: TParallelFunc1;
+      AOnAllFinishProc: TThreadProcedure = nil); overload;
+    class procedure ForEach(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
+      AOnAllFinishProc: TThreadProcedure = nil); overload;
+    class procedure ForEachNonBlocking(const AFrom, ATo: NativeInt; AFunc: TParallelFunc1;
+      AOnAllFinishProc: TThreadProcedure = nil); overload;
+    class procedure ForEachNonBlocking(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
+      AOnAllFinishProc: TThreadProcedure = nil); overload;
+
+    /// <summary>
+    /// Defines number of threads to use while looping
+    /// </summary>
+    /// <remarks>
+    /// Number of threads cannot exceed number of iterations, e.g. if you loops from 1 to 5 and
+    ///  set MaxThreads to 10, TSvParallel will use maximum of 5 threads
+    /// </remarks>
+    class property MaxThreads: Integer read FMaxThreads write FMaxThreads;
   end;
 
 implementation
@@ -276,5 +417,339 @@ begin
 end;
 
 
+
+{ TSvParallel }
+
+class constructor TSvParallel.Create;
+begin
+  FMaxThreads := CPUCount;
+end;
+
+class destructor TSvParallel.Destroy;
+begin
+//
+end;
+
+class procedure TSvParallel.DoForEach(const AFrom, ATo: NativeInt; AFunc1: TParallelFunc1;
+  AFunc2: TParallelFunc2; AOnAllFinishProc: TThreadProcedure; AMode: TParallelMode);
+var
+  pool: TSvThreadPool;
+  I, iLoopCount: NativeInt;
+  iThreads: Integer;
+begin
+  if AFrom > ATo then
+    Exit;
+
+  iLoopCount := (ATo - AFrom) + 1;
+
+  pool := TSvThreadPool.Create;
+  pool.CurrPos := AFrom;
+  pool.MaxPos := ATo;
+  pool.MaxThreads := FMaxThreads;
+
+  if iLoopCount > FMaxThreads then
+    iThreads := FMaxThreads
+  else
+    iThreads := iLoopCount;
+
+  pool.Proc1 := AFunc1;
+  pool.Proc2 := AFunc2;
+  pool.Mode := AMode;
+  pool.FFinishProc := AOnAllFinishProc;
+ //create pool threads
+  for i := 0 to iThreads - 1 do
+  begin
+    pool.Add(I);
+  end;
+
+  pool.Start;
+
+  case AMode of
+    pmBlocking:
+    begin
+      pool.WaitFor();
+      pool.Free;
+    end;
+    pmNonBlocking: ;//do nothing;
+  end;
+end;
+
+class procedure TSvParallel.ForEach(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
+  AOnAllFinishProc: TThreadProcedure);
+begin
+  DoForEach(AFrom, ATo, nil, AFunc, AOnAllFinishProc, pmBlocking);
+end;
+
+class procedure TSvParallel.ForEachNonBlocking(const AFrom, ATo: NativeInt; AFunc: TParallelFunc1;
+  AOnAllFinishProc: TThreadProcedure);
+begin
+  DoForEach(AFrom, ATo, AFunc, nil, AOnAllFinishProc, pmNonBlocking);
+end;
+
+class procedure TSvParallel.ForEachNonBlocking(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
+  AOnAllFinishProc: TThreadProcedure);
+begin
+  DoForEach(AFrom, ATo, nil, AFunc, AOnAllFinishProc, pmNonBlocking);
+end;
+
+class procedure TSvParallel.ForEach(const AFrom, ATo: NativeInt; AFunc: TParallelFunc1;
+  AOnAllFinishProc: TThreadProcedure);
+begin
+  DoForEach(AFrom, ATo, AFunc, nil, AOnAllFinishProc, pmBlocking);
+end;
+
+{ TSvParallelThread }
+
+constructor TSvParallelThread.Create(AOwner: TSvThreadPool);
+begin
+  inherited Create(True);
+  FThreadIndex := 0;
+  FOwner := AOwner;
+  FFreePool := True;
+end;
+
+destructor TSvParallelThread.Destroy;
+begin
+  inherited Destroy;
+end;
+
+procedure TSvParallelThread.DoTerminate;
+begin
+  inherited;
+  case FOwner.Mode of
+   // pmBlocking: WaitFor();
+    pmNonBlocking:
+    begin
+      if FFreePool and (FOwner.CurrPos >= FOwner.FMaxPos) then
+      begin
+        FOwner.SetDontFreeFlag(False);
+        FOwner.Terminate();
+        FOwner.Release(FThreadIndex);
+        if Assigned(FOwner.FFinishProc) then
+          Synchronize(FOwner.FFinishProc);
+
+        FOwner.Free;
+        //set queue to release current thread
+        TThread.Queue(nil, procedure begin Self.Free end);
+      end;
+    end;
+  end;
+end;
+
+procedure TSvParallelThread.Execute;
+var
+  nCurrent: NativeInt;
+begin
+  FOwner.FAbort := False;
+  nCurrent := FOwner.GetNextValue;
+  while (nCurrent <= FOwner.FMaxPos) and not (Terminated) do
+  begin
+    if Assigned(FOwner.FProc1) then
+      FOwner.FProc1(nCurrent, FOwner.FAbort)
+    else
+      FOwner.FProc2(nCurrent, FThreadIndex, FOwner.FAbort);
+
+    nCurrent := FOwner.GetNextValue;
+  end;
+end;
+
+{ TSvThreadPool }
+
+function TSvThreadPool.Add(const AThreadIndex: NativeInt): Integer;
+var
+  thread: TSvParallelThread;
+begin
+  thread := TSvParallelThread.Create(Self);
+  thread.FThreadIndex := AThreadIndex;
+  Result := FThreads.Add(thread);
+end;
+
+constructor TSvThreadPool.Create;
+begin
+  inherited Create();
+  FThreads := TObjectList<TSvParallelThread>.Create(False);
+  FCSection := TCriticalSection.Create;
+  FProc1 := nil;
+  FProc2 := nil;
+  FFinishProc := nil;
+end;
+
+destructor TSvThreadPool.Destroy;
+begin
+  case FMode of
+    pmBlocking:
+    begin
+      FThreads.OwnsObjects := True;
+    end;
+    pmNonBlocking:
+    begin
+      FThreads.OwnsObjects := False;
+    end;
+  end;
+  FThreads.Free;
+  FCSection.Free;
+  inherited Destroy;
+end;
+
+function TSvThreadPool.GetAbort: Boolean;
+begin
+  Result := FAbort;
+end;
+
+function TSvThreadPool.GetCurrPos: NativeInt;
+begin
+  FCSection.Acquire;
+  try
+    Result := FCurrPos;
+  finally
+    FCSection.Release;
+  end;
+end;
+
+function TSvThreadPool.GetMaxPos: NativeInt;
+begin
+  Result := FMaxPos;
+end;
+
+function TSvThreadPool.GetMaxThreads: Integer;
+begin
+  Result := FMaxThreads;
+end;
+
+function TSvThreadPool.GetMode: TParallelMode;
+begin
+  Result := FMode;
+end;
+
+function TSvThreadPool.GetNextValue: NativeInt;
+begin
+  FCSection.Acquire;
+  try
+    Result := FCurrPos;
+    if FAbort then
+      FCurrPos := FMaxPos + 1
+    else
+      Inc(FCurrPos);
+  finally
+    FCSection.Release;
+  end;
+end;
+
+function TSvThreadPool.GetProc1: TParallelFunc1;
+begin
+  Result := FProc1;
+end;
+
+function TSvThreadPool.GetProc2: TParallelFunc2;
+begin
+  Result := FProc2;
+end;
+
+function TSvThreadPool.GetThread(const AIndex: Integer): TSvParallelThread;
+begin
+  Result := FThreads[AIndex];
+end;
+
+procedure TSvThreadPool.Release(AExceptIndex: NativeInt);
+var
+  i: Integer;
+begin
+  for i := 0 to FThreads.Count - 1 do
+  begin
+    if i <> AExceptIndex then
+      FThreads[i].Free;
+  end;
+end;
+
+procedure TSvThreadPool.SetAbort(const Value: Boolean);
+begin
+  if Value <> FAbort then
+  begin
+    FAbort := Value;
+  end;
+end;
+
+procedure TSvThreadPool.SetCurrPos(const Value: NativeInt);
+begin
+  if Value <> FCurrPos then
+  begin
+    FCurrPos := Value;
+  end;
+end;
+
+procedure TSvThreadPool.SetDontFreeFlag(AValue: Boolean);
+var
+  i: Integer;
+begin
+  for i := 0 to FThreads.Count - 1 do
+  begin
+    FThreads[i].FFreePool := AValue;
+  end;
+end;
+
+procedure TSvThreadPool.SetMaxPos(const Value: NativeInt);
+begin
+  if Value <> FMaxPos then
+  begin
+    FMaxPos := Value;
+  end;
+end;
+
+procedure TSvThreadPool.SetMaxThreads(const Value: Integer);
+begin
+  if Value <> FMaxThreads then
+  begin
+    FMaxThreads := Value;
+  end;
+end;
+
+procedure TSvThreadPool.SetMode(const Value: TParallelMode);
+begin
+  if Value <> FMode then
+  begin
+    FMode := Value;
+  end;
+end;
+
+procedure TSvThreadPool.SetProc1(const Value: TParallelFunc1);
+begin
+  FProc1 := Value;
+end;
+
+procedure TSvThreadPool.SetProc2(const Value: TParallelFunc2);
+begin
+  FProc2 := Value;
+end;
+
+procedure TSvThreadPool.Start;
+var
+  i: Integer;
+begin
+  for i := 0 to FThreads.Count - 1 do
+  begin
+    FThreads[i].Start;
+  end;
+end;
+
+procedure TSvThreadPool.Terminate;
+var
+  i: Integer;
+begin
+  for i := 0 to FThreads.Count - 1 do
+  begin
+    FThreads[i].Terminate;
+  end;
+end;
+
+procedure TSvThreadPool.WaitFor(AExceptIndex: NativeInt = -1);
+var
+  i: Integer;
+begin
+  for i := 0 to FThreads.Count - 1 do
+  begin
+    if i <> AExceptIndex then
+      FThreads[i].WaitFor;
+  end;
+end;
 
 end.
