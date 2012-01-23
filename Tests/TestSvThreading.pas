@@ -26,7 +26,20 @@ type
     procedure TestExecute;
   end;
 
+  TestTSvParallel = class(TTestCase)
+  private
+  //  sw: TStopwatch;
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestForEach;
+  end;
+
 implementation
+
+uses
+  SyncObjs;
 
 { TestTSvFuture }
 
@@ -78,8 +91,60 @@ begin
   Check(sw.ElapsedMilliseconds >= 500, '5');
 end;
 
+{ TestTSvParallel }
+
+procedure TestTSvParallel.SetUp;
+begin
+  inherited;
+
+end;
+
+procedure TestTSvParallel.TearDown;
+begin
+  inherited;
+
+end;
+
+procedure TestTSvParallel.TestForEach;
+var
+  AFrom, ATo: NativeInt;
+  iCounter: Integer;
+  AFunc1: TParallelFunc1;
+  AFunc2 : TParallelFunc2;
+begin
+  AFrom := 0;
+  ATo := 1000 - 1;
+  iCounter := 0;
+  AFunc1 := procedure(const i: NativeInt; var Abort: Boolean)
+    begin
+      TInterlocked.Increment(iCounter);
+      Sleep(5);
+    end;
+  AFunc2 := procedure(const i, AThreadIndex: NativeInt; var Abort: Boolean)
+    begin
+      Abort := iCounter = 500;
+      if not Abort then
+        TInterlocked.Increment(iCounter);
+
+      Sleep(5);
+    end;
+  TSvParallel.ForEach(AFrom, ATo, AFunc1, nil);
+  CheckEquals(ATo + 1, iCounter);
+  iCounter := 0;
+  TSvParallel.ForEach(AFrom, ATo, AFunc2, nil);
+  CheckEquals(500, iCounter);
+  iCounter := 0;
+  TSvParallel.ForEachNonBlocking(AFrom, ATo, AFunc2,
+    procedure
+    begin
+      CheckEquals(500, iCounter);
+    end);
+  Sleep(1000);
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestTSvFuture.Suite);
+  RegisterTest(TestTSvParallel.Suite);
 end.
 
