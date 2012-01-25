@@ -109,17 +109,22 @@ end;
 procedure TestTSvParallel.TestAsync;
 var
   vFlag, vFlag2, vFlag3, vFlag4: Boolean;
+  vThr: TSvAsyncThread;
 begin
   vFlag := False;
   vFlag2 := False;
   vFlag3 := False;
   vFlag4 := False;
   TSvParallel.SyncFinishEvents := False;
-  TSvParallel.Async(
+  vThr := TSvParallel.Async(
     procedure
     begin
-      Sleep(50);
-      vFlag := True;
+      vThr.NameThreadForDebugging('asyncThread');
+      if not vThr.CheckTerminated then
+      begin
+        Sleep(50);
+        vFlag := True;
+      end;
     end,
     procedure
     begin
@@ -136,7 +141,7 @@ begin
     begin
       vFlag4 := True;
     end);
-  Sleep(1000);
+  Sleep(250);
   CheckTrue(vFlag);
   CheckTrue(vFlag2);
   CheckTrue(vFlag3);
@@ -147,10 +152,11 @@ procedure TestTSvParallel.TestForEach;
 var
   AFrom, ATo: NativeInt;
   iCounter: Integer;
-  AFunc1: TParallelFunc1;
-  AFunc2 : TParallelFunc2;
+  AFunc1: TParallelProc1;
+  AFunc2 : TParallelProc2;
   vFlag: Boolean;
 begin
+  TSvParallel.MaxThreads := 10;
   AFrom := 0;
   ATo := 1000 - 1;
   iCounter := 0;
@@ -161,32 +167,33 @@ begin
     end;
   AFunc2 := procedure(const i, AThreadIndex: NativeInt; var Abort: Boolean)
     begin
-      Abort := iCounter = 500;
+      Abort := iCounter >= 500;
       if not Abort then
         TInterlocked.Increment(iCounter);
 
-     // Sleep(5);
+      Sleep(5);
     end;
   TSvParallel.ForEach(AFrom, ATo, AFunc1, nil);
-  CheckEquals(ATo + 1, iCounter);
+  CheckEquals(ATo + 1, iCounter, '1');
   iCounter := 0;
   TSvParallel.ForEach(AFrom, ATo, AFunc2, nil);
-  CheckEquals(500, iCounter);
+  CheckEquals(500, iCounter, '2');
   iCounter := 0;
   vFlag := False;
+
   TSvParallel.ForEachNonBlocking(AFrom, ATo, AFunc2,
     procedure
     begin
       vFlag := True;
     end);
   Sleep(500);
-  CheckEquals(500, iCounter);
-  CheckTrue(vFlag);
+  CheckEquals(500, iCounter, '3');
+  CheckTrue(vFlag, '4');
 end;
 
 initialization
   // Register any test cases with the test runner
   RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 3));
-  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 1));
+  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 3));
 end.
 
