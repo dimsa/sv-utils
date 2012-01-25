@@ -39,7 +39,7 @@ type
 implementation
 
 uses
-  SyncObjs;
+  SyncObjs, TestExtensions;
 
 { TestTSvFuture }
 
@@ -144,7 +144,7 @@ end;
 
 initialization
   // Register any test cases with the test runner
-  RegisterTest(TestTSvFuture.Suite);
-  RegisterTest(TestTSvParallel.Suite);
+  RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 3));
+  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 5));
 end.
 

@@ -24,6 +24,7 @@ type
   private
     FString: string;
     FInt: Integer;
+    FDouble: Double;
     procedure SetString(const Value: string);
     procedure SetInt(const Value: Integer);
   public
@@ -31,6 +32,8 @@ type
     property AInt: Integer read FInt write SetInt;
     [SvSerialize]
     property AString: string read FString write SetString;
+    [SvSerialize]
+    property ADouble: Double read FDouble write FDouble;
   end;
 
   IDemoObj = interface
@@ -681,7 +684,7 @@ begin
 end;
 
 const
-  JSON_STRING = '{"TMyRec.Main":{"FString":"Some unicode Português \" Русский/ Ελληνικά","FInt":2147483647}}';
+  JSON_STRING = '{"TMyRec.Main":{"FString":"Some unicode Português \" Русский/ Ελληνικά","FInt":2147483647,"FDouble":15865874.1569854}}';
 
 procedure TestTSvJsonSerializerFactory.TestSerializeRecord;
 var
@@ -691,17 +694,20 @@ var
 begin
   ARec.AString := PROP_STRING;
   ARec.AInt := PROP_INTEGER;
+  ARec.ADouble := PROP_DOUBLE;
 
   FSerializer.Marshall<TMyRec>(ARec, 'Record.json');
 
 
   ARec.AString := '';
   ARec.AInt := -1;
+  ARec.ADouble := -1;
 
   ARec := FSerializer.UnMarshall<TMyRec>('Record.json');
 
   CheckEqualsString(PROP_STRING, ARec.AString);
   CheckEquals(PROP_INTEGER, ARec.AInt);
+  CheckEquals(PROP_DOUBLE, ARec.ADouble);
 
   //test string
   FString.LoadFromFile('Record.json');
@@ -711,6 +717,7 @@ begin
   ARec :=  FSerializer.UnMarshall<TMyRec>(FJsonString, TEncoding.UTF8);
   CheckEqualsString(PROP_STRING, ARec.AString);
   CheckEquals(PROP_INTEGER, ARec.AInt);
+  CheckEquals(PROP_DOUBLE, ARec.ADouble);
 end;
 
 { TMyRec }
