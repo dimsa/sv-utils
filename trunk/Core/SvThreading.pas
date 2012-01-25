@@ -260,6 +260,7 @@ type
     class procedure ForEachNonBlocking(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
       AOnAllFinishProc: TThreadProcedure = nil); overload;
 
+
     /// <summary>
     /// Defines number of threads to use while looping
     /// </summary>
