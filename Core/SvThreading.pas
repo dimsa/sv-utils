@@ -152,6 +152,17 @@ type
     property FreePool: Boolean read FFreePool write FFreePool;
   end;
 
+  TSvAsyncThread = class(TThread)
+  private
+    FProc: TProc;
+    FFinishProc: TThreadProcedure;
+  protected
+    procedure DoTerminate; override;
+    procedure Execute; override;
+  public
+    constructor Create(const AProc: TProc; AFinishProc: TThreadProcedure = nil);
+  end;
+
   ISvThreadPool = interface
   ['{AA2B2700-659B-4DEE-BBBC-62B28C7D2431}']
     //getters and setters
@@ -244,13 +255,21 @@ type
   private
     class var
       FMaxThreads: Integer;
+      FSyncEvents: Boolean;
   private
-    class constructor Create;
-    class destructor Destroy;
+   class constructor Create;
+   class destructor Destroy;
 
     class procedure DoForEach(const AFrom, ATo: NativeInt; AFunc1: TParallelFunc1;
       AFunc2: TParallelFunc2; AOnAllFinishProc: TThreadProcedure; AMode: TParallelMode);
   public
+    /// <summary>
+    /// Parallel loop implementation
+    /// </summary>
+    /// <param name="AFrom">Value from which to start loop</param>
+    /// <param name="ATo">Last value to loop from</param>
+    /// <param name="AFunc">Procedure which will be called after each iteration</param>
+    /// <param name="AOnAllFinishProc">Procedure to call when loop completes</param>
     class procedure ForEach(const AFrom, ATo: NativeInt; AFunc: TParallelFunc1;
       AOnAllFinishProc: TThreadProcedure = nil); overload;
     class procedure ForEach(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
@@ -259,7 +278,13 @@ type
       AOnAllFinishProc: TThreadProcedure = nil); overload;
     class procedure ForEachNonBlocking(const AFrom, ATo: NativeInt; AFunc: TParallelFunc2;
       AOnAllFinishProc: TThreadProcedure = nil); overload;
-
+    /// <summary>
+    /// Calls anonymous method in separate thread. Additional method can be specified
+    /// which will be called after main proc execution
+    /// </summary>
+    /// <param name="AProc">procedure to execute in separate thread</param>
+    /// <param name="AProcAfterFinish">procedure to execute after main proc has finished execution</param>
+    class procedure Async(const AProc: TProc; AProcAfterFinish: TThreadProcedure = nil);
 
     /// <summary>
     /// Defines number of threads to use while looping
@@ -269,11 +294,17 @@ type
     ///  set MaxThreads to 10, TSvParallel will use maximum of 5 threads
     /// </remarks>
     class property MaxThreads: Integer read FMaxThreads write FMaxThreads;
+    class property SyncFinishEvents: Boolean read FSyncEvents write FSyncEvents;
   end;
 
 implementation
 
 { TSvFuture<T> }
+
+function CreateAsyncThread(const AProc: TProc; AProcAfterFinish: TThreadProcedure = nil): TSvAsyncThread;
+begin
+  Result := TSvAsyncThread.Create(AProc, AProcAfterFinish);
+end;
 
 procedure TSvFuture<T>.Cancel;
 begin
@@ -421,9 +452,15 @@ end;
 
 { TSvParallel }
 
+class procedure TSvParallel.Async(const AProc: TProc; AProcAfterFinish: TThreadProcedure);
+begin
+  CreateAsyncThread(AProc, AProcAfterFinish).Start;
+end;
+
 class constructor TSvParallel.Create;
 begin
   FMaxThreads := CPUCount;
+  FSyncEvents := False;
 end;
 
 class destructor TSvParallel.Destroy;
@@ -527,11 +564,16 @@ begin
         FOwner.Terminate();
         FOwner.Release(FThreadIndex);
         if Assigned(FOwner.FFinishProc) then
-          Synchronize(FOwner.FFinishProc);
+        begin
+          if TSvParallel.SyncFinishEvents then
+            Synchronize(FOwner.FFinishProc)
+          else
+            FOwner.FFinishProc();
+        end;
 
         FOwner.Free;
         //set queue to release current thread
-        TThread.Queue(nil, procedure begin Self.Free end);
+        Queue(procedure begin Self.Free; end);
       end;
     end;
   end;
@@ -552,6 +594,33 @@ begin
 
     nCurrent := FOwner.GetNextValue;
   end;
+end;
+
+{ TSvAsyncThread }
+
+constructor TSvAsyncThread.Create(const AProc: TProc; AFinishProc: TThreadProcedure);
+begin
+  inherited Create(True);
+  FreeOnTerminate := True;
+  FProc := AProc;
+  FFinishProc := AFinishProc;
+end;
+
+procedure TSvAsyncThread.DoTerminate;
+begin
+  inherited;
+  if Assigned(FFinishProc) then
+  begin
+    if TSvParallel.SyncFinishEvents then
+      Synchronize(FFinishProc)
+    else
+      FFinishProc();
+  end;
+end;
+
+procedure TSvAsyncThread.Execute;
+begin
+  FProc();
 end;
 
 { TSvThreadPool }
