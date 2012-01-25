@@ -34,12 +34,13 @@ type
     procedure TearDown; override;
   published
     procedure TestForEach;
+    procedure TestAsync();
   end;
 
 implementation
 
 uses
-  SyncObjs, TestExtensions;
+  SyncObjs, TestExtensions, Forms;
 
 { TestTSvFuture }
 
@@ -105,6 +106,43 @@ begin
 
 end;
 
+procedure TestTSvParallel.TestAsync;
+var
+  vFlag, vFlag2, vFlag3, vFlag4: Boolean;
+begin
+  vFlag := False;
+  vFlag2 := False;
+  vFlag3 := False;
+  vFlag4 := False;
+  TSvParallel.SyncFinishEvents := False;
+  TSvParallel.Async(
+    procedure
+    begin
+      Sleep(50);
+      vFlag := True;
+    end,
+    procedure
+    begin
+      vFlag3 := True;
+    end);
+
+  TSvParallel.Async(
+    procedure
+    begin
+      Sleep(50);
+      vFlag2 := True;
+    end,
+    procedure
+    begin
+      vFlag4 := True;
+    end);
+  Sleep(1000);
+  CheckTrue(vFlag);
+  CheckTrue(vFlag2);
+  CheckTrue(vFlag3);
+  CheckTrue(vFlag4);
+end;
+
 procedure TestTSvParallel.TestForEach;
 var
   AFrom, ATo: NativeInt;
@@ -145,6 +183,6 @@ end;
 initialization
   // Register any test cases with the test runner
   RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 3));
-  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 5));
+  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 3));
 end.
 
