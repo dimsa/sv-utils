@@ -149,6 +149,7 @@ var
   iCounter: Integer;
   AFunc1: TParallelFunc1;
   AFunc2 : TParallelFunc2;
+  vFlag: Boolean;
 begin
   AFrom := 0;
   ATo := 1000 - 1;
@@ -156,7 +157,7 @@ begin
   AFunc1 := procedure(const i: NativeInt; var Abort: Boolean)
     begin
       TInterlocked.Increment(iCounter);
-      Sleep(5);
+      //Sleep(5);
     end;
   AFunc2 := procedure(const i, AThreadIndex: NativeInt; var Abort: Boolean)
     begin
@@ -164,7 +165,7 @@ begin
       if not Abort then
         TInterlocked.Increment(iCounter);
 
-      Sleep(5);
+     // Sleep(5);
     end;
   TSvParallel.ForEach(AFrom, ATo, AFunc1, nil);
   CheckEquals(ATo + 1, iCounter);
@@ -172,17 +173,20 @@ begin
   TSvParallel.ForEach(AFrom, ATo, AFunc2, nil);
   CheckEquals(500, iCounter);
   iCounter := 0;
+  vFlag := False;
   TSvParallel.ForEachNonBlocking(AFrom, ATo, AFunc2,
     procedure
     begin
-      CheckEquals(500, iCounter);
+      vFlag := True;
     end);
-  Sleep(1000);
+  Sleep(500);
+  CheckEquals(500, iCounter);
+  CheckTrue(vFlag);
 end;
 
 initialization
   // Register any test cases with the test runner
   RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 3));
-  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 3));
+  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 1));
 end.
 

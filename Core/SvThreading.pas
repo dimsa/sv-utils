@@ -552,13 +552,22 @@ begin
 end;
 
 procedure TSvParallelThread.DoTerminate;
+var
+  bLastThread: Boolean;
 begin
   inherited;
   case FOwner.Mode of
    // pmBlocking: WaitFor();
     pmNonBlocking:
     begin
-      if FFreePool and (FOwner.CurrPos >= FOwner.FMaxPos) then
+      FOwner.FCSection.Acquire;
+      try
+        bLastThread := FFreePool and (FOwner.FCurrPos >= FOwner.FMaxPos);
+      finally
+        FOwner.FCSection.Release;
+      end;
+
+      if bLastThread then
       begin
         FOwner.SetDontFreeFlag(False);
         FOwner.Terminate();
@@ -570,7 +579,6 @@ begin
           else
             FOwner.FFinishProc();
         end;
-
         FOwner.Free;
         //set queue to release current thread
         Queue(procedure begin Self.Free; end);
