@@ -66,19 +66,19 @@ begin
     end;
 
     cs.First;
-    iVal := cs.Fields[0].ValueOrDef<Integer>(0);
+    iVal := cs.Fields[0].ValueOrDef(0);
     CheckEquals(1, iVal);
     cs.Edit;
     cs.Fields[0].Clear;
     cs.Post;
-    iVal := cs.Fields[0].ValueOrDef<Integer>(0);
+    iVal := cs.Fields[0].ValueOrDef(0);
     CheckEquals(0, iVal);
-    sVal := cs.Fields[1].ValueOrDef<string>('null');
+    sVal := cs.Fields[1].ValueOrDef('null');
     CheckEquals('Name 1', sVal);
     cs.Edit;
     cs.Fields[1].Clear;
     cs.Post;
-    sVal := cs.Fields[1].ValueOrDef<string>('null');
+    sVal := cs.Fields[1].ValueOrDef('null');
     CheckEqualsString('null', sVal);
   finally
     cs.Free;
