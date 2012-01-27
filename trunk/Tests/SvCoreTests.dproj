@@ -52,6 +52,12 @@
 			<DCCReference Include="..\Core\SvThreading.pas"/>
 			<DCCReference Include="TestSvDesignPatterns.pas"/>
 			<DCCReference Include="..\Core\SvDesignPatterns.pas"/>
+			<DCCReference Include="..\Core\SvHelpers.pas"/>
+			<DCCReference Include="TestSvHelpers.pas"/>
+			<RcItem Include="..\SQLite3\Bin\Sunset.jpg">
+				<ResourceType>RCDATA</ResourceType>
+				<ResourceId>JpgImage_1</ResourceId>
+			</RcItem>
 			<BuildConfiguration Include="Release">
 				<Key>Cfg_2</Key>
 				<CfgParent>Base</CfgParent>
