@@ -1,4 +1,4 @@
-(*
+﻿(*
 * Copyright (c) 2011, Linas Naginionis
 * Contacts: lnaginionis@gmail.com or support@soundvibe.net
 * All rights reserved.

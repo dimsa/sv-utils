@@ -14,6 +14,8 @@ program SvCoreTests;
 {$APPTYPE CONSOLE}
 {$ENDIF}
 
+{$R *.dres}
+
 uses
   Forms,
   TestFramework,
@@ -22,7 +24,9 @@ uses
   TestSvThreading in 'TestSvThreading.pas',
   SvThreading in '..\Core\SvThreading.pas',
   TestSvDesignPatterns in 'TestSvDesignPatterns.pas',
-  SvDesignPatterns in '..\Core\SvDesignPatterns.pas';
+  SvDesignPatterns in '..\Core\SvDesignPatterns.pas',
+  SvHelpers in '..\Core\SvHelpers.pas',
+  TestSvHelpers in 'TestSvHelpers.pas';
 
 {$R *.RES}
 
