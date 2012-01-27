@@ -186,7 +186,7 @@ begin
     begin
       vFlag := True;
     end);
-  Sleep(500);
+  Sleep(1000);
   CheckEquals(500, iCounter, '3');
   CheckTrue(vFlag, '4');
 end;
