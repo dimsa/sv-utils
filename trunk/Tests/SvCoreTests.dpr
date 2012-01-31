@@ -28,7 +28,8 @@ uses
   SvHelpers in '..\Core\SvHelpers.pas',
   TestSvHelpers in 'TestSvHelpers.pas',
   SvClasses in '..\Core\SvClasses.pas',
-  TestSvClasses in 'TestSvClasses.pas';
+  TestSvClasses in 'TestSvClasses.pas',
+  SvRttiUtils in '..\Core\SvRttiUtils.pas';
 
 {$R *.RES}
 
