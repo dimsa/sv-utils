@@ -26,7 +26,9 @@ uses
   TestSvDesignPatterns in 'TestSvDesignPatterns.pas',
   SvDesignPatterns in '..\Core\SvDesignPatterns.pas',
   SvHelpers in '..\Core\SvHelpers.pas',
-  TestSvHelpers in 'TestSvHelpers.pas';
+  TestSvHelpers in 'TestSvHelpers.pas',
+  SvClasses in '..\Core\SvClasses.pas',
+  TestSvClasses in 'TestSvClasses.pas';
 
 {$R *.RES}
 
