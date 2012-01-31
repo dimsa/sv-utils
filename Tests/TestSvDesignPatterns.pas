@@ -53,6 +53,17 @@ type
     procedure TestGetInstance;
   end;
 
+  TestTSingleton = class(TTestCase)
+  private
+    FSingleton: TSingleton<TStringList>;
+    FIntfSingleton: ISingleton<TStringList>;
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestGetInstance;
+  end;
+
 implementation
 
 procedure TestTFactory.SetUp;
@@ -265,9 +276,67 @@ begin
   CheckFalse(FMultiton.IsRegistered(AKey));
 end;
 
+{ TestTSingleton }
+
+procedure TestTSingleton.SetUp;
+var
+  method: TFactoryMethod<TStringList>;
+begin
+  inherited;
+
+  method := function: TStringList
+    begin
+      Result := TStringList.Create;
+      Result.AddStrings(TArray<string>.Create('1','2','3'));
+    end;
+
+  FSingleton := TSingleton<TStringList>.Create;
+  FIntfSingleton := TSingleton<TStringList>.Create(method);
+
+  FSingleton.RegisterConstructor(method);
+end;
+
+procedure TestTSingleton.TearDown;
+begin
+  FSingleton.Free;
+  inherited;
+end;
+
+procedure TestTSingleton.TestGetInstance;
+var
+  sl1, sl2: TStringList;
+  singleton: ISingleton<TStringList>;
+begin
+  sl1 := nil;
+  sl1 := FSingleton.GetInstance;
+  CheckTrue(Assigned(sl1));
+  CheckEquals(3, sl1.Count);
+  CheckEqualsString('1', sl1[0]);
+  CheckEqualsString('2', sl1[1]);
+  CheckEqualsString('3', sl1[2]);
+  sl2 := nil;
+  sl2 := FIntfSingleton.GetInstance;
+  CheckTrue(Assigned(sl2));
+  CheckEquals(3, sl2.Count);
+  CheckEqualsString('1', sl2[0]);
+  CheckEqualsString('2', sl2[1]);
+  CheckEqualsString('3', sl2[2]);
+  //default constructor
+  singleton := TSingleTon<TStringList>.Create();
+  sl1 := nil;
+  sl1 := singleton.GetInstance;
+  CheckTrue(Assigned(sl1));
+  sl1.AddStrings(TArray<string>.Create('1','2','3'));
+  CheckEquals(3, sl1.Count);
+  CheckEqualsString('1', sl1[0]);
+  CheckEqualsString('2', sl1[1]);
+  CheckEqualsString('3', sl1[2]);
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestTFactory.Suite);
   RegisterTest(TestTMultiton.Suite);
+  RegisterTest(TestTSingleton.Suite);
 end.
 

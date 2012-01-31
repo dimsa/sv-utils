@@ -56,6 +56,7 @@
 			<DCCReference Include="TestSvHelpers.pas"/>
 			<DCCReference Include="..\Core\SvClasses.pas"/>
 			<DCCReference Include="TestSvClasses.pas"/>
+			<DCCReference Include="..\Core\SvRttiUtils.pas"/>
 			<RcItem Include="..\SQLite3\Bin\Sunset.jpg">
 				<ResourceType>RCDATA</ResourceType>
 				<ResourceId>JpgImage_1</ResourceId>
@@ -73,7 +74,7 @@
 			</BuildConfiguration>
 		</ItemGroup>
 		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
-		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj"/>
 		<ProjectExtensions>
 			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
 			<Borland.ProjectType/>

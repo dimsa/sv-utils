@@ -30,7 +30,7 @@ unit SvDesignPatterns;
 interface
 
 uses
-  SysUtils, Generics.Collections, Rtti;
+  SysUtils, Generics.Collections, Rtti, SyncObjs, SvRttiUtils;
 
 type
   EFactoryMethodKeyAlreadyRegisteredException = class(Exception);
@@ -148,6 +148,41 @@ type
     property OwnsObjects: Boolean read FOwnsObjects write FOwnsObjects;
   end;
 
+
+  ISingleton<T: class> = interface
+    ['{EFF4476A-694E-42EB-BC4E-2384E4860F92}']
+    function GetIsThreadSafe: Boolean;
+    procedure SetIsThreadSafe(const Value: Boolean);
+
+    procedure RegisterConstructor(const AConstructorMethod: TFactoryMethod<T>);
+    function GetInstance(): T;
+
+    property IsThreadSafe: Boolean read GetIsThreadSafe write SetIsThreadSafe;
+  end;
+  /// <summary>
+  /// Singleton implementation
+  /// </summary>
+  TSingleton<T: class> = class(TInterfacedObject, ISingleton<T>)
+  private
+    FMethod: TFactoryMethod<T>;
+    FCreated: Boolean;
+    FObject: T;
+    FIsThreadSafe: Boolean;
+    FCSection: TCriticalSection;
+    function GetIsThreadSafe: Boolean;
+    procedure SetIsThreadSafe(const Value: Boolean);
+  protected
+    function CreateNew(): T;
+  public
+    constructor Create(); overload;
+    constructor Create(const AConstructorMethod: TFactoryMethod<T>); overload;
+    destructor Destroy; override;
+
+    procedure RegisterConstructor(const AConstructorMethod: TFactoryMethod<T>);
+    function GetInstance(): T;
+
+    property IsThreadSafe: Boolean read GetIsThreadSafe write SetIsThreadSafe;
+  end;
 implementation
 
 { TAbstractFactory<TKey, TBaseType> }
@@ -159,26 +194,8 @@ begin
 end;
 
 class function TAbstractFactory<TKey, TBaseType>.CreateElement: TBaseType;
-var
-  rType: TRttiType;
-  AMethCreate: TRttiMethod;
-  instanceType: TRttiInstanceType;
 begin
-  rType := TRttiContext.Create.GetType(TypeInfo(TBaseType));
-  if rType.IsInstance then
-  begin
-    for AMethCreate in rType.GetMethods do
-    begin
-      if (AMethCreate.IsConstructor) and (Length(AMethCreate.GetParameters) = 0) then
-      begin
-        instanceType := rType.AsInstance;
-
-        Result := AMethCreate.Invoke(instanceType.MetaclassType, []).AsType<TBaseType>;
-
-        Break;
-      end;
-    end;
-  end;
+  Result := TSvRtti.CreateNewClass<TBaseType>;
 end;
 
 destructor TAbstractFactory<TKey, TBaseType>.Destroy;
@@ -377,6 +394,73 @@ begin
     ClearObject(AValue);                    
   end;
   FLifetimeWatcher.Remove(AKey);
+end;
+
+{ TSingleton<T> }
+
+constructor TSingleton<T>.Create;
+begin
+  inherited Create();
+  FMethod := nil;
+  FCreated := False;
+  FCSection := TCriticalSection.Create;
+end;
+
+constructor TSingleton<T>.Create(const AConstructorMethod: TFactoryMethod<T>);
+begin
+  Create;
+  FMethod := AConstructorMethod;
+end;
+
+function TSingleton<T>.CreateNew: T;
+begin
+  if Assigned(FMethod) then
+    FObject := FMethod()
+  else
+    FObject := TSvRtti.CreateNewClass<T>;
+
+  Result := FObject;
+  FCreated := True;
+end;
+
+destructor TSingleton<T>.Destroy;
+begin
+  if FCreated then
+    FObject.Free;
+
+  FCSection.Free;
+  inherited Destroy;
+end;
+
+function TSingleton<T>.GetInstance: T;
+begin
+  if FIsThreadSafe then
+    FCSection.Enter;
+  try
+    if FCreated then
+      Result := FObject
+    else
+      Result := CreateNew();
+  finally
+    if FIsThreadSafe then
+      FCSection.Leave;
+  end;
+end;
+
+function TSingleton<T>.GetIsThreadSafe: Boolean;
+begin
+  Result := FIsThreadSafe;
+end;
+
+procedure TSingleton<T>.RegisterConstructor(const AConstructorMethod: TFactoryMethod<T>);
+begin
+  FMethod := AConstructorMethod;
+end;
+
+procedure TSingleton<T>.SetIsThreadSafe(const Value: Boolean);
+begin
+  if Value <> FIsThreadSafe then
+    FIsThreadSafe := Value;
 end;
 
 end.
