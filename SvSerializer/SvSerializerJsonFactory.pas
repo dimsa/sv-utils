@@ -35,6 +35,9 @@ type
     procedure BeginDeSerialization(AStream: TStream); override;
     procedure EndDeSerialization(AStream: TStream); override;
 
+    function DoSetFromNumber(AJsonNumber: TJSONNumber): TValue; virtual;
+    function DoSetFromString(AJsonString: TJSONString; AType: TRttiType; var ASkip: Boolean): TValue; virtual;
+
     function FindRecordFieldName(const AFieldName: string; ARecord: TRttiRecordType): TRttiField;
   
     procedure SerializeObject(const AKey: string; const obj: TValue; AStream: TStream;
@@ -239,6 +242,69 @@ begin
   inherited Destroy;
 end;
 
+function TSvJsonSerializerFactory.DoSetFromNumber(AJsonNumber: TJSONNumber): TValue;
+var
+  sVal: string;
+  AInt: Integer;
+  AInt64: Int64;
+begin
+  sVal := AJsonNumber.ToString;
+
+  if TryStrToInt(sVal, AInt) then
+  begin
+    Result := AInt;
+  end
+  else if TryStrToInt64(sVal, AInt64) then
+  begin
+    Result := AInt64;
+  end
+  else
+  begin
+    Result := AJsonNumber.AsDouble;
+  end;
+end;
+
+function TSvJsonSerializerFactory.DoSetFromString(AJsonString: TJSONString; AType: TRttiType;
+  var ASkip: Boolean): TValue;
+var
+  i: Integer;
+begin
+  if Assigned(AType) then
+  begin
+    case AType.TypeKind of
+      tkEnumeration:
+      begin
+        Result := TValue.FromOrdinal(AType.Handle,
+          GetEnumValue(AType.Handle, AJsonString.Value));
+      end;
+      tkSet:
+      begin
+        i := StringToSet(AType.Handle, AJsonString.Value);
+        TValue.Make(@i, AType.Handle, Result);
+      end;
+      tkVariant:
+      begin
+        Result := TValue.FromVariant(AJsonString.Value);
+      end;
+      tkUString, tkWString, tkLString, tkWChar, tkChar, tkString:
+      begin
+        //avoid skip
+        Result := AJsonString.Value;
+      end
+      else
+      begin
+        //error msg value, skip
+        PostError('Cannot set unknown type value: ' + AType.ToString);
+        ASkip := True;
+      end;
+    end;
+  end
+  else
+  begin
+    Result := AJsonString.Value;
+  end;
+end;
+
 procedure TSvJsonSerializerFactory.EndSerialization;
 begin
   inherited;
@@ -287,7 +353,7 @@ begin
     Result := TJSONNull.Create
   else
   begin
-    
+    Result := nil;
     case AFrom.Kind of
       tkInteger: Result := TJSONNumber.Create(AFrom.AsInteger);
       tkInt64: Result := TJSONNumber.Create(AFrom.AsInt64);
@@ -434,7 +500,7 @@ begin
             GetValue(FField.GetValue(AFrom.GetReferenceToRawData), nil)));
         end;
 
-      end;
+      end
      { tkMethod: ;
       tkInterface: ;
       tkClassRef: ;
@@ -548,8 +614,7 @@ end;
 
 function TSvJsonSerializerFactory.SetValue(const AFrom: TJSONValue; const AObj: TValue; AProp: TRttiProperty; AType: TRttiType; var Skip: Boolean): TValue;
 var
-  AInt, i: Integer;
-  AInt64: Int64;
+  i: Integer;
   sVal: string;
   arrVal: array of TValue;
   rType: TRttiType;
@@ -574,57 +639,11 @@ begin
   begin
     if AFrom is TJSONNumber then
     begin
-      sVal := TJSONNumber(AFrom).ToString;
-
-      if TryStrToInt(sVal, AInt) then
-      begin
-        Result := AInt;
-      end
-      else if TryStrToInt64(sVal, AInt64) then
-      begin
-        Result := AInt64;
-      end
-      else
-      begin
-        Result := TJSONNumber(AFrom).AsDouble;
-      end;
+      Result := DoSetFromNumber(TJSONNumber(AFrom));
     end
     else if AFrom is TJSONString then
     begin
-      if Assigned(AType) then
-      begin
-        case AType.TypeKind of
-          tkEnumeration:
-          begin
-            Result := TValue.FromOrdinal(AType.Handle,
-              GetEnumValue(AType.Handle, TJSONString(AFrom).Value));
-          end;
-          tkSet:
-          begin
-            i := StringToSet(AType.Handle, TJSONString(AFrom).Value);
-            TValue.Make(@i, AType.Handle, Result);
-          end;
-          tkVariant:
-          begin
-            Result := TValue.FromVariant(TJSONString(AFrom).Value);
-          end;
-          tkUString, tkWString, tkLString, tkWChar, tkChar, tkString:
-          begin
-            //avoid skip
-            Result := TJSONString(AFrom).Value;
-          end
-          else
-          begin
-            //error msg value, skip
-            PostError('Cannot set unknown type value: ' + AType.ToString);
-            Skip := True;
-          end;
-        end;
-      end
-      else
-      begin
-        Result := TJSONString(AFrom).Value;
-      end;
+      Result := DoSetFromString(TJSONString(AFrom), AType, Skip);
     end
     else if AFrom is TJSONTrue then
     begin
@@ -900,9 +919,6 @@ begin
 end;
 
 function TSvJsonString.EscapeValue(const AValue: string): string;
-var
-  i, ix: Integer;
-  AChar: Char;
 
   procedure AddChars(const AChars: string; var Dest: string; var AIndex: Integer); inline;
   begin
@@ -918,6 +934,9 @@ var
     Inc(AIndex, 6);
   end;
 
+var
+  i, ix: Integer;
+  AChar: Char;
 begin
   Result := AValue;
   ix := 1;

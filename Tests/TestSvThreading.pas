@@ -15,6 +15,8 @@ uses
   TestFramework, Classes, SysUtils, SvThreading, Diagnostics;
 
 type
+  {$HINTS OFF}
+
   TestTSvFuture = class(TTestCase)
   private
     FSvFuture: TSvFuture<Integer>;
@@ -190,7 +192,7 @@ begin
   CheckEquals(500, iCounter, '3');
   CheckTrue(vFlag, '4');
 end;
-
+{$HINTS ON}
 initialization
   // Register any test cases with the test runner
   RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 3));

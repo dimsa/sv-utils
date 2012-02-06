@@ -16,7 +16,8 @@ uses
 
 type
   // Test methods for class TFactory
-
+  {$HINTS OFF}
+  //we dont need hints in our tests
   TestTFactory = class(TTestCase)
   private
     FFunc: TFactoryMethod<TStringList>;
@@ -51,6 +52,7 @@ type
     procedure TestUnregisterAll;
     procedure TestGetEnumerator;
     procedure TestGetInstance;
+    procedure TestGetDefaultInstance;
   end;
 
   TestTSingleton = class(TTestCase)
@@ -240,6 +242,23 @@ begin
   CheckEquals(0, FMultiton.Count);
 end;
 
+procedure TestTMultiton.TestGetDefaultInstance;
+var
+  AKey: string;
+begin
+  CheckEquals(10, FMultiton.Count);
+  AKey := '11';
+  FMultiton.RegisterFactoryMethod(AKey,
+    function: TStringList
+    begin
+      Result := TStringList.Create;
+      Result.Add('111');
+    end);
+  CheckEquals(11, FMultiton.Count);
+  FMultiton.RegisterDefaultKey(AKey);
+  CheckEqualsString('111', FMultiton.GetDefaultInstance[0]);
+end;
+
 procedure TestTMultiton.TestGetEnumerator;
 var
   pair: TPair<string,TStringList>;
@@ -332,6 +351,8 @@ begin
   CheckEqualsString('2', sl1[1]);
   CheckEqualsString('3', sl1[2]);
 end;
+
+{$HINTS ON}
 
 initialization
   // Register any test cases with the test runner

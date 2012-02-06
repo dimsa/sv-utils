@@ -387,7 +387,7 @@ procedure TestTSvJsonSerializerFactory.TestEscapeValue;
   end;
 
 var
-  sTest, sRes: string;
+  sRes: string;
   sw: TStopwatch;
   i: Integer;
   iMs1, iMs2: Int64;

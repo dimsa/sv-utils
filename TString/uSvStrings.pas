@@ -15,7 +15,9 @@ uses
   SysUtils, Generics.Collections, Classes;
 
 type
-  TWideCharSet = set of WideChar;
+  {$WARNINGS OFF}
+  TWideCharSet = set of Char;
+  {$WARNINGS ON}
 
   TStringCompressionLevel = (scNone, scFastest, scDefault, scMax);
 
@@ -1437,7 +1439,7 @@ begin
   LResCount := 0;
 
   for I := 1 to System.Length(FValue) do
-    if FValue[I] in ADelimiters then
+    if CharInSet(FValue[I], ADelimiters) then
       Inc(LResCount);
 
   { Set the length of the output split array }
@@ -1449,7 +1451,7 @@ begin
   LLag := 0;
 
   for I := 1 to System.Length(FValue) do
-    if FValue[I] in ADelimiters then
+    if CharInSet(FValue[I], ADelimiters) then
     begin
       LPiece := System.Copy(FValue, LPrevIndex, (I - LPrevIndex));
 
@@ -1730,7 +1732,7 @@ begin
 
   { Find the left point }
   for I := 1 to System.Length(FValue) do
-    if not (FValue[I] in ACharSet) then
+    if not (CharInSet(FValue[I], ACharSet)) then
     begin
       L := I;
       Break;
@@ -1738,7 +1740,7 @@ begin
 
   { Find the right point }
   for I := System.Length(FValue) downto 1 do
-    if not (FValue[I] in ACharSet) then
+    if not (CharInSet(FValue[I], ACharSet)) then
     begin
       R := I;
       Break;
@@ -1766,7 +1768,7 @@ var
 begin
   { Loop until we get to the first non-whitespace char. We've determined that 1st char is whitespace. }
   for I := 1 to System.Length(FValue) do
-    if not (FValue[I] in ACharSet) then
+    if not (CharInSet(FValue[I], ACharSet)) then
     begin
       { If nothing was done, take the ref, or copy otherwise }
       if I = 1 then
@@ -1815,7 +1817,7 @@ var
 begin
   { Loop until we get to the first non-whitespace char. We've determined that 1st char is whitespace. }
   for I := System.Length(FValue) downto 1 do
-    if not (FValue[I] in ACharSet) then
+    if not (CharInSet(FValue[I], ACharSet)) then
     begin
       { If nothing was done, take the ref, or copy otherwise }
       if I = System.Length(FValue) then
