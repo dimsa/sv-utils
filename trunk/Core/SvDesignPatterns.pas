@@ -64,11 +64,15 @@ type
       end;
   private
     FFactoryMethods: TDictionary<TKey, TFactoryMethod<TBaseType>>;
+    FDefaultKey: TKey;
     function GetCount: Integer;
   public
     constructor Create; virtual;
     destructor Destroy; override;
-  
+    /// <summary>
+    /// Registers default key which will be used when getting factory through GetDefaultInstance()
+    /// </summary>
+    procedure RegisterDefaultKey(const AKey: TKey); virtual;
     /// <summary>
     /// Registers new factory method. If AFactoryMethod is nil, factory will use 
     ///   parameterless constructor
@@ -78,6 +82,9 @@ type
     procedure RegisterFactoryMethod(const AKey: TKey; AFactoryMethod: TFactoryMethod<TBaseType>); virtual;
     procedure UnregisterFactoryMethod(const AKey: TKey); virtual;
     procedure UnregisterAll(); virtual;
+    /// <summary>
+    /// Checks if given key has had registered factory method
+    /// </summary>
     function IsRegistered(const AKey: TKey): Boolean; virtual;
 
     class function CreateElement(): TBaseType;
@@ -87,11 +94,18 @@ type
     function GetInstance(const AKey: TKey): TBaseType; virtual; abstract;
   public
     /// <summary>
+    /// Retrieves default factory.
+    /// </summary>
+    /// <remarks>
+    /// Default key must be registered for this method to work properly
+    /// </remarks>
+    function GetDefaultInstance(): TBaseType; virtual;
+    /// <summary>
     /// Count of registered factory methods
     /// </summary>
     property Count: Integer read GetCount;
   end;
-  
+
   /// <summary>
   /// Factory method class
   /// </summary>
@@ -117,7 +131,6 @@ type
   private
     FLifetimeWatcher: TDictionary<TKey,TValue>;
     FOwnsObjects: Boolean;
-
     procedure ClearObject(const AValue: TValue);
     procedure ClearObjects();
   public
@@ -191,6 +204,7 @@ constructor TAbstractFactory<TKey, TBaseType>.Create;
 begin
   inherited Create();
   FFactoryMethods := TDictionary<TKey, TFactoryMethod<TBaseType>>.Create();
+  FDefaultKey := System.Default(TKey);
 end;
 
 class function TAbstractFactory<TKey, TBaseType>.CreateElement: TBaseType;
@@ -209,6 +223,11 @@ begin
   Result := FFactoryMethods.Count;
 end;
 
+function TAbstractFactory<TKey, TBaseType>.GetDefaultInstance: TBaseType;
+begin
+  Result := GetInstance(FDefaultKey);
+end;
+
 function TAbstractFactory<TKey, TBaseType>.GetEnumerator: TFactoryEnumerator;
 begin
   Result := TFactoryEnumerator.Create(Self);
@@ -217,6 +236,14 @@ end;
 function TAbstractFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;
 begin
   Result := FFactoryMethods.ContainsKey(AKey);
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.RegisterDefaultKey(const AKey: TKey);
+begin
+  if IsRegistered(AKey) then
+    FDefaultKey := AKey
+  else
+    raise TFactoryMethodKeyNotRegisteredException.Create('Key not registered');
 end;
 
 procedure TAbstractFactory<TKey, TBaseType>.RegisterFactoryMethod(const AKey: TKey;
