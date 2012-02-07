@@ -108,6 +108,7 @@ type
 
     procedure ClearErrors();
 
+    property Errors: TList<string> read FErrors;
     property Owner: TSvSerializer read FOwner;
   end;
 
@@ -168,12 +169,12 @@ type
     /// Deserializes all added objects from the file
     /// </summary>
     /// <param name="AFilename">filename from where to load object's properties</param>
-    procedure DeSerialize(const AFromFilename: string); overload;
+    procedure DeSerialize(const AFromFilename: string); overload; virtual;
     /// <summary>
     /// Deserializes all added objects from the stream
     /// </summary>
     /// <param name="AStream">stream from where to load object's properties</param>
-    procedure DeSerialize(AFromStream: TStream); overload;
+    procedure DeSerialize(AFromStream: TStream); overload; virtual;
     /// <summary>
     /// Deserializes all added objects from the string
     /// </summary>
@@ -183,17 +184,17 @@ type
     /// Serializes all added objects to the file
     /// </summary>
     /// <param name="AFilename">filename where to store objects</param>
-    procedure Serialize(const AToFilename: string); overload;
+    procedure Serialize(const AToFilename: string); overload; virtual;
     /// <summary>
     /// Serializes all added objects to the stream
     /// </summary>
     /// <param name="AStream">stream where to store objects</param>
-    procedure Serialize(AToStream: TStream); overload;
+    procedure Serialize(AToStream: TStream); overload; virtual;
     /// <summary>
     /// Serializes all added objects to the string
     /// </summary>
     /// <param name="AStream">stream where to store objects</param>
-    procedure Serialize(var AToString: string; const AEncoding: TEncoding); overload;
+    procedure Serialize(var AToString: string; const AEncoding: TEncoding); overload; virtual;
     /// <summary>
     ///  Marshalls record's properties into stream
     /// </summary>

@@ -157,6 +157,7 @@ type
 
   TestTSvJsonSerializerFactory = class(TTestCase)
   strict private
+    FILE_SERIALIZE: string;
     FSerializer: TSvSerializer;
     FSvJsonSerializerFactory: TSvJsonSerializerFactory;
   public
@@ -170,6 +171,7 @@ type
     procedure TestSerializeRecord();
     procedure TestEscapeValue();
     procedure TestJQGrid();
+    procedure TestSQLiteSerializeDeserialize();
   end;
 
 implementation
@@ -179,10 +181,11 @@ uses
   DateUtils,
   TypInfo,
   Rtti,
-  Diagnostics;
+  Diagnostics,
+  SvSerializer.Extensions.SQLite;
 
 const
-  FILE_SERIALIZE = 'TestSerialize.json';
+ // FILE_SERIALIZE = 'TestSerialize.json';
 
 
   KEY_VALUE: string = 'Main';
@@ -253,6 +256,7 @@ procedure TestTSvJsonSerializerFactory.SetUp;
 begin
   FSerializer := TSvSerializer.Create(sstJson);
   FSvJsonSerializerFactory := TSvJsonSerializerFactory(FSerializer.Factory);
+  FILE_SERIALIZE := 'TestSerialize.json';
 end;
 
 procedure TestTSvJsonSerializerFactory.TearDown;
@@ -718,6 +722,16 @@ begin
   CheckEqualsString(PROP_STRING, ARec.AString);
   CheckEquals(PROP_INTEGER, ARec.AInt);
   CheckEquals(PROP_DOUBLE, ARec.ADouble);
+end;
+
+procedure TestTSvJsonSerializerFactory.TestSQLiteSerializeDeserialize;
+begin
+  FSerializer.Free;
+  FSerializer := TSQLiteSerializer.Create();
+
+  FILE_SERIALIZE := 'test.db3';
+
+  TestSerializeAndDeserialize();
 end;
 
 { TMyRec }

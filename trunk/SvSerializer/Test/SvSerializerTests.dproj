@@ -10,18 +10,9 @@
 			<DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
 			<Platform Condition="'$(Platform)'==''">Win32</Platform>
 			<TargetedPlatforms>1</TargetedPlatforms>
+			<Platform>Win32</Platform>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
-			<Base>true</Base>
-		</PropertyGroup>
-		<PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
-			<Base_Win64>true</Base_Win64>
-			<CfgParent>Base</CfgParent>
-			<Base>true</Base>
-		</PropertyGroup>
-		<PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
-			<Base_Win32>true</Base_Win32>
-			<CfgParent>Base</CfgParent>
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_1)'!=''">
@@ -48,16 +39,6 @@
 			<DCC_DcuOutput>.</DCC_DcuOutput>
 			<DCC_ExeOutput>.\$(Config)\$(Platform)</DCC_ExeOutput>
 		</PropertyGroup>
-		<PropertyGroup Condition="'$(Base_Win64)'!=''">
-			<Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
-		</PropertyGroup>
-		<PropertyGroup Condition="'$(Base_Win32)'!=''">
-			<VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-			<DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
-			<VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
-			<VerInfo_Locale>1033</VerInfo_Locale>
-			<Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
-		</PropertyGroup>
 		<PropertyGroup Condition="'$(Cfg_1)'!=''">
 			<DCC_MapFile>3</DCC_MapFile>
 			<DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
@@ -71,13 +52,16 @@
 			<DCC_DebugInformation>false</DCC_DebugInformation>
 		</PropertyGroup>
 		<ItemGroup>
-			<DelphiCompile Include="$(MainSource)">
+			<DelphiCompile Include="SvSerializerTests.dpr">
 				<MainSource>MainSource</MainSource>
 			</DelphiCompile>
 			<DCCReference Include="TestSvSerializerJsonFactory.pas"/>
 			<DCCReference Include="..\SvSerializerJsonFactory.pas"/>
 			<DCCReference Include="..\SvSerializer.pas"/>
 			<DCCReference Include="..\SvSerializerXMLFactory.pas"/>
+			<DCCReference Include="..\SvSerializer.Extensions.SQLite.pas"/>
+			<DCCReference Include="..\..\SQLite3\Source\SQLiteTable3.pas"/>
+			<DCCReference Include="..\..\SQLite3\Source\SQLite3.pas"/>
 			<BuildConfiguration Include="Release">
 				<Key>Cfg_2</Key>
 				<CfgParent>Base</CfgParent>
@@ -91,7 +75,7 @@
 			</BuildConfiguration>
 		</ItemGroup>
 		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
-		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
+		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj"/>
 		<ProjectExtensions>
 			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
 			<Borland.ProjectType/>
