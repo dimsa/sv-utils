@@ -22,7 +22,10 @@ uses
   TestSvSerializerJsonFactory in 'TestSvSerializerJsonFactory.pas',
   SvSerializerJsonFactory in '..\SvSerializerJsonFactory.pas',
   SvSerializer in '..\SvSerializer.pas',
-  SvSerializerXMLFactory in '..\SvSerializerXMLFactory.pas';
+  SvSerializerXMLFactory in '..\SvSerializerXMLFactory.pas',
+  SvSerializer.Extensions.SQLite in '..\SvSerializer.Extensions.SQLite.pas',
+  SQLiteTable3 in '..\..\SQLite3\Source\SQLiteTable3.pas',
+  SQLite3 in '..\..\SQLite3\Source\SQLite3.pas';
 
 {$R *.RES}
 
