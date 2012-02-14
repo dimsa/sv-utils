@@ -478,7 +478,7 @@ begin
               //serialize TDataset
               for lCurrentProp in rType.GetProperties do
               begin
-                if lCurrentProp.Visibility = mvPublished then
+                if lCurrentProp.Visibility in [mvPublic,mvPublished] then
                 begin
                   //try to serialize only published properties
                   TJSONObject(Result).AddPair(TJSONPair.Create(lCurrentProp.Name,
@@ -618,7 +618,7 @@ var
   sVal: string;
   arrVal: array of TValue;
   rType: TRttiType;
-  lEnumMethod, lCreateMethod : TRttiMethod;
+  lEnumMethod : TRttiMethod;
   lEnumerator, AValue : TValue;
   lClearMethod : TRttiMethod;
   FField: TRttiField ;
@@ -631,6 +631,7 @@ var
   jArr: TJSONArray;
   fld: TField;
   bCreated: Boolean;
+  obj: TObject;
 begin
   Skip := False;
   bCreated := False;
@@ -747,17 +748,13 @@ begin
                 //if AProp not assigned then we must create it
                 if rType.IsInstance then
                 begin
-                  for lCreateMethod in rType.GetMethods do
+                  obj := TSvSerializer.CreateType(rType.Handle);
+                  if Assigned(obj) then
                   begin
-                    if lCreateMethod.IsConstructor and (System.Length(lCreateMethod.GetParameters)=0) then
-                    begin
-                      AValue := lCreateMethod.Invoke(rType.AsInstance.MetaclassType, []);
-                      bCreated := True;
-                      Break;
-                    end;
+                    AValue := obj;
+                    bCreated := True;
                   end;
                 end;
-
               end;
 
               lEnumMethod := TSvRttiInfo.GetBasicMethod('Add', rType);
@@ -819,7 +816,7 @@ begin
                     AJsonValue := TJSONArray(AFrom).Get(i);
 
                     {TODO -oLinas -cGeneral : fix arguments}
-
+                    //AParams[0].ParamType.AsInstance.
                     arrVal[i] := SetValue(AJsonValue, AObj, nil, AParams[0].ParamType, Skip);
 
 
@@ -871,11 +868,10 @@ begin
           end;
           tkClass:
           begin
+            rType := TSvRttiInfo.GetType(AType.Handle);
             if Assigned(AProp) then
             begin
-              rType := TSvRttiInfo.GetType(AType.Handle);
               Result := TSvRttiInfo.GetValue(AProp, AObj);
-
               for i := 0 to TJSONObject(AFrom).Size - 1 do
               begin
                 CurrProp := rType.GetProperty(TJSONObject(AFrom).Get(i).JsonString.Value);
@@ -886,9 +882,25 @@ begin
                 end;
               end;
              //  Result := AProp.GetValue(AObj);
-
+            end
+            else
+            begin
+              {DONE -oLinas -cGeneral : create new class and set all props}
+              obj := TSvSerializer.CreateType(rType.Handle);
+              if Assigned(obj) then
+              begin
+                Result := obj;
+                for i := 0 to TJSONObject(AFrom).Size - 1 do
+                begin
+                  CurrProp := rType.GetProperty(TJSONObject(AFrom).Get(i).JsonString.Value);
+                  if Assigned(CurrProp) then
+                  begin
+                    CurrProp.SetValue(Result.AsObject, SetValue(TJSONObject(AFrom).Get(i).JsonValue, AObj, CurrProp,
+                      CurrProp.PropertyType, Skip));
+                  end;
+                end;
+              end;
             end;
-
           end
           else
           begin

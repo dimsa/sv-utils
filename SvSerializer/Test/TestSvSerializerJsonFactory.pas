@@ -25,6 +25,7 @@ type
     FString: string;
     FInt: Integer;
     FDouble: Double;
+    FSList: array of string;
     procedure SetString(const Value: string);
     procedure SetInt(const Value: Integer);
   public
