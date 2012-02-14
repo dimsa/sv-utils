@@ -25,7 +25,6 @@ type
     FString: string;
     FInt: Integer;
     FDouble: Double;
-    FSList: array of string;
     procedure SetString(const Value: string);
     procedure SetInt(const Value: Integer);
   public
@@ -86,6 +85,13 @@ type
     property InvData: TClientDataset read FInvData write FInvData;
   end;
 
+  TSimple = class
+  private
+    FList: TArray<string>;
+  public
+    property List: TArray<string> read FList write FList;
+  end;
+
   TDemoObj = class(TInterfacedObject, IDemoObj)
   private
     FName: string;
@@ -108,6 +114,7 @@ type
     FSvString: TSvString;
     FDict: TDictionary<string, TMyRec>;
     FDataset: TClientDataSet;
+    FSimple: TSimple;
     function GetName: string;
     procedure SetName(const Value: string);
   public
@@ -153,6 +160,8 @@ type
     property Dict: TDictionary<string, TMyRec> read FDict write FDict;
     [SvSerialize]
     property Dataset: TClientDataSet read FDataset write FDataset;
+    [SvSerialize]
+    property SimpleObj: TSimple read FSimple write FSimple;
   end;
   // Test methods for class TSvJsonSerializerFactory
 
@@ -231,6 +240,8 @@ begin
   FDataset.FieldDefs.Add(FIELD_DOUBLE, ftFloat);
   FDataset.FieldDefs.Add(FIELD_TDATETIME, ftDateTime);
   FDataset.CreateDataSet;
+  FSimple := TSimple.Create;
+  SetLength(FSimple.FList, 0);
 end;
 
 destructor TDemoObj.Destroy;
@@ -240,6 +251,7 @@ begin
   FFont.Free;
   FDict.Free;
   FDataset.Free;
+  FSimple.Free;
   inherited;
 end;
 
@@ -553,6 +565,7 @@ begin
     TestObj.Dict.Add('1', ARec2);
    // TestObj.Dict.Add(PROP_STRING, PROP_STRING);
    // TestObj.Dict.Add('1', '111');
+    TestObj.SimpleObj.List := TArray<string>.Create(PROP_STRING, PROP_STRING, PROP_STRING);
     //TDataset property
     for i := 1 to 10 do
     begin
@@ -665,6 +678,12 @@ begin
 
       Inc(i);
     end;
+    //obkect and array in it
+    CheckEquals(3, Length(TestObj.SimpleObj.List));
+    CheckEqualsString(PROP_STRING, TestObj.SimpleObj.List[0]);
+    CheckEqualsString(PROP_STRING, TestObj.SimpleObj.List[1]);
+    CheckEqualsString(PROP_STRING, TestObj.SimpleObj.List[2]);
+
     //TDataset property
     CheckEquals(10, TestObj.Dataset.RecordCount);
     TestObj.Dataset.First;

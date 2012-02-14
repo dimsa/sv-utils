@@ -37,6 +37,14 @@ type
 
     function DoSetFromNumber(AJsonNumber: TJSONNumber): TValue; virtual;
     function DoSetFromString(AJsonString: TJSONString; AType: TRttiType; var ASkip: Boolean): TValue; virtual;
+    function DoSetFromArray(AJsonArray: TJSONArray; AType: TRttiType; const AObj: TValue; AProp: TRttiProperty; var ASkip: Boolean): TValue; virtual;
+    function DoSetFromObject(AJsonObject: TJSONObject; AType: TRttiType; const AObj: TValue; AProp: TRttiProperty; var ASkip: Boolean): TValue; virtual;
+
+    function DoGetFromArray(const AFrom: TValue; AProp: TRttiProperty): TJSONValue; virtual;
+    function DoGetFromClass(const AFrom: TValue; AProp: TRttiProperty): TJSONValue; virtual;
+    function DoGetFromEnum(const AFrom: TValue; AProp: TRttiProperty): TJSONValue; virtual;
+    function DoGetFromRecord(const AFrom: TValue; AProp: TRttiProperty): TJSONValue; virtual;
+    function DoGetFromVariant(const AFrom: TValue; AProp: TRttiProperty): TJSONValue; virtual;
 
     function FindRecordFieldName(const AFieldName: string; ARecord: TRttiRecordType): TRttiField;
   
@@ -98,7 +106,6 @@ begin
     finally
       sBytes.Free;
     end;
-    
   end
   else
   begin
@@ -113,7 +120,6 @@ begin
   NullStrictConvert := FOldNullStrConvert;
   if Assigned(FMainObj) then
     FMainObj.Free;
-    
 end;
 
 procedure TSvJsonSerializerFactory.BeginSerialization;
@@ -188,7 +194,6 @@ begin
                 TSvRttiInfo.SetValue(rprop, obj, AValue);
             end;
           end;
-
         end;
       end
       else
@@ -242,6 +247,360 @@ begin
   inherited Destroy;
 end;
 
+function TSvJsonSerializerFactory.DoGetFromArray(const AFrom: TValue;
+  AProp: TRttiProperty): TJSONValue;
+var
+  i: Integer;
+  jArr: TJSONArray;
+begin
+  Result := TJSONArray.Create();
+  jArr := TJSONArray(Result);
+  for i := 0 to AFrom.GetArrayLength - 1 do
+  begin
+    jArr.AddElement(GetValue(AFrom.GetArrayElement(i), nil));
+  end;
+end;
+
+function TSvJsonSerializerFactory.DoGetFromClass(const AFrom: TValue;
+  AProp: TRttiProperty): TJSONValue;
+var
+  i, iRecNo: Integer;
+  jArr: TJSONArray;
+  jObj: TJSONObject;
+  rType, lEnumType: TRttiType;
+  lEnumMethod, lMoveNextMethod: TRttiMethod;
+  lEnumerator: TValue;
+  lCurrentProp: TRttiProperty;
+  ADst: TDataSet;
+begin
+  Result := nil;
+  rType := TSvRttiInfo.GetType(AFrom.TypeInfo);
+  if Assigned(rType) and (AFrom.IsObject) then
+  begin
+    if AFrom.AsObject is TDataset then
+    begin
+     // Result := TJSONObject.Create;
+      ADst := TDataSet(AFrom.AsObject);
+
+      Result := TJSONArray.Create();
+     // TJSONObject(Result).AddPair(TJSONPair.Create(CT_DATASET_RECORDS,
+     //   Result));
+      ADst.DisableControls;
+      FormatSettings := FFormatSettings;
+      try
+        iRecNo := ADst.RecNo;
+        ADst.First;
+        while not ADst.Eof do
+        begin
+          jObj := TJSONObject.Create();
+          for i := 0 to ADst.Fields.Count - 1 do
+          begin
+            if ADst.Fields[i].IsNull then
+            begin
+              jObj.AddPair(ADst.Fields[i].FieldName, TJSONNull.Create);
+            end
+            else
+            begin
+              jObj.AddPair(ADst.Fields[i].FieldName, TSvJsonString.Create(ADst.Fields[i].AsString));
+            end;
+
+          end;
+          TJSONArray(Result).AddElement(jObj);
+          ADst.Next;
+        end;
+
+        ADst.RecNo := iRecNo;
+      finally
+        FormatSettings := FOldFormatSettings;
+        ADst.EnableControls;
+      end;
+    end
+    else
+    begin
+      lEnumMethod := rType.GetMethod('GetEnumerator');
+      if Assigned(lEnumMethod) then
+      begin
+        //enumerator exists
+        Result := TJSONArray.Create();
+        jArr := TJSONArray(Result);
+        lEnumerator := lEnumMethod.Invoke(AFrom,[]);
+        lEnumType :=  TSvRttiInfo.GetType(lEnumerator.TypeInfo);
+        lMoveNextMethod := lEnumType.GetMethod('MoveNext');
+        lCurrentProp := lEnumType.GetProperty('Current');
+        Assert(Assigned(LMoveNextMethod), 'MoveNext method not found');
+        Assert(Assigned(lCurrentProp), 'Current property not found');
+        while lMoveNextMethod.Invoke(lEnumerator.AsObject,[]).asBoolean do
+        begin
+          jArr.AddElement(GetValue(lCurrentProp.GetValue(lEnumerator.AsObject), lCurrentProp));
+        end;
+
+        if lEnumerator.IsObject then
+        begin
+          lEnumerator.AsObject.Free;
+        end;
+      end
+      else
+      begin
+        //other object types
+        Result := TJSONObject.Create;
+          //try to serialize
+        TJSONObject(Result).AddPair(TJSONPair.Create(CT_QUALIFIEDNAME,
+          TSvJsonString.Create(rType.QualifiedName)));
+
+        //serialize TDataset
+        for lCurrentProp in rType.GetProperties do
+        begin
+          if lCurrentProp.Visibility in [mvPublic,mvPublished] then
+          begin
+            //try to serialize only published properties
+            TJSONObject(Result).AddPair(TJSONPair.Create(lCurrentProp.Name,
+              GetValue(lCurrentProp.GetValue(AFrom.AsObject), lCurrentProp)));
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+function TSvJsonSerializerFactory.DoGetFromEnum(const AFrom: TValue;
+  AProp: TRttiProperty): TJSONValue;
+var
+  bVal: Boolean;
+begin
+  if AFrom.TryAsType<Boolean>(bVal) then
+  begin
+    if bVal then
+      Result := TJSONTrue.Create
+    else
+      Result := TJSONFalse.Create;
+  end
+  else
+  begin
+    Result := TSvJsonString.Create(AFrom.ToString);
+  end;
+end;
+
+function TSvJsonSerializerFactory.DoGetFromRecord(const AFrom: TValue;
+  AProp: TRttiProperty): TJSONValue;
+var
+  rType: TRttiType;
+  FRecord: TRttiRecordType;
+  FField: TRttiField;
+begin
+  rType := TSvRttiInfo.GetType(AFrom.TypeInfo);
+  FRecord := rType.AsRecord;
+  Result := TJSONObject.Create();
+  for FField in FRecord.GetFields do
+  begin
+    TJSONObject(Result).AddPair(TJSONPair.Create(FField.Name,
+      GetValue(FField.GetValue(AFrom.GetReferenceToRawData), nil)));
+  end;
+end;
+
+function TSvJsonSerializerFactory.DoGetFromVariant(const AFrom: TValue;
+  AProp: TRttiProperty): TJSONValue;
+var
+  AVariant: Variant;
+begin
+  AVariant := AFrom.AsVariant;
+
+  if VarIsNull(AVariant) or VarIsEmpty(AVariant) then
+    Result := TJSONNull.Create
+  else
+    Result := TSvJsonString.Create(VarToStr(AVariant));
+end;
+
+function TSvJsonSerializerFactory.DoSetFromArray(AJsonArray: TJSONArray; AType: TRttiType;
+  const AObj: TValue; AProp: TRttiProperty; var ASkip: Boolean): TValue;
+var
+  AJsonValue: TJSONValue;
+  arrVal: array of TValue;
+  i, x: Integer;
+  ADst: TDataSet;
+  fld: TField;
+  sVal: string;
+  obj: TObject;
+  AValue, lEnumerator: TValue;
+  bCreated: Boolean;
+  lEnumMethod, lClearMethod: TRttiMethod;
+  AParams: TArray<TRttiParameter>;
+begin
+  bCreated := False;
+  AValue := TValue.Empty;
+  if Assigned(AType) then
+  begin
+    case AType.TypeKind of
+      tkArray:
+      begin
+        SetLength(arrVal, AJsonArray.Size);
+
+        for i := 0 to Length(arrVal)-1 do
+        begin
+          arrVal[i] := SetValue(AJsonArray.Get(i), AObj, AProp, TRttiArrayType(AType).ElementType, ASkip);
+        end;
+
+        Result := TValue.FromArray(AType.Handle, arrVal);
+      end;
+      tkDynArray:
+      begin
+        SetLength(arrVal, AJsonArray.Size);
+
+        for i := 0 to Length(arrVal)-1 do
+        begin
+          arrVal[i] := SetValue(AJsonArray.Get(i), AObj, AProp, TRttiDynamicArrayType(AType).ElementType, ASkip);
+        end;
+
+        Result := TValue.FromArray(AType.Handle, arrVal);
+      end;
+      tkClass:
+      begin
+        if Assigned(AType) then
+        begin
+          if Assigned(AProp) then
+          begin
+            Result := TSvRttiInfo.GetValue(AProp, AObj);
+            if Result.AsObject is TDataSet then
+            begin
+              //deserialize TDataSet
+              ADst := TDataSet(Result.AsObject);
+
+              if Assigned(AJsonArray) then
+              begin
+                ADst.DisableControls;
+                FormatSettings := FFormatSettings;
+                try
+                  for i := 0 to AJsonArray.Size - 1 do
+                  begin
+                    try
+                      ADst.Append;
+
+                      for x := 0 to TJSONObject(AJsonArray.Get(i)).Size - 1 do
+                      begin
+                        //get fieldname from json object
+                        sVal := TJSONObject(AJsonArray.Get(i)).Get(x).JsonString.Value;
+                        fld := ADst.FindField(sVal);
+                        if Assigned(fld) then
+                        begin
+                          //check if not null
+                          if TJSONObject(AJsonArray.Get(i)).Get(x).JsonValue is TJSONNull then
+                            fld.Clear
+                          else
+                            fld.AsString := TJSONObject(AJsonArray.Get(i)).Get(x).JsonValue.Value;
+                        end;
+                      end;
+
+                      ADst.Post;
+                    except
+                      on E:Exception do
+                      begin
+                        PostError(E.Message);
+                      end;
+                    end;
+                  end;
+
+                finally
+                  ADst.EnableControls;
+                  FormatSettings := FOldFormatSettings;
+                end;
+                Exit;
+              end;
+
+            end;
+          end
+          else
+          begin
+            //if AProp not assigned then we must create it
+            if AType.IsInstance then
+            begin
+              obj := TSvSerializer.CreateType(AType.Handle);
+              if Assigned(obj) then
+              begin
+                AValue := obj;
+                bCreated := True;
+              end;
+            end;
+          end;
+
+          lEnumMethod := TSvRttiInfo.GetBasicMethod('Add', AType);
+          if Assigned(lEnumMethod) and ( (Assigned(AProp)) or not (AValue.IsEmpty)  ) then
+          begin
+            if AValue.IsEmpty and Assigned(AProp) then
+              AValue := TSvRttiInfo.GetValue(AProp, AObj);
+           // AValue := AProp.GetValue(AObj);
+            lClearMethod := TSvRttiInfo.GetBasicMethod('Clear', AType);
+            if Assigned(lClearMethod) and (Length(lClearMethod.GetParameters) = 0) then
+            begin
+              lClearMethod.Invoke(AValue, []);
+            end;
+
+            AParams := lEnumMethod.GetParameters;
+
+            if Length(AParams) > 1 then
+            begin
+              SetLength(arrVal, Length(AParams));
+              //probably we are dealing with key value pair class like TDictionary
+
+              for i := 0 to AJsonArray.Size - 1 do
+              begin
+                AJsonValue := AJsonArray.Get(i);
+
+
+                Assert(Length(AParams) = TJSONObject(AJsonValue).Size, 'Parameters count differ');
+                if AJsonValue is TJSONObject then
+                begin
+                  for x := 0 to TJSONObject(AJsonValue).Size - 1 do
+                  begin
+                    arrVal[x] := SetValue(TJSONObject(AJsonValue).Get(x).JsonValue,
+                      AObj, nil, AParams[x].ParamType, ASkip);
+                  end;
+                end
+                else if AJsonValue is TJSONArray then
+                begin
+                  for x := 0 to TJSONArray(AJsonValue).Size - 1 do
+                  begin
+                    arrVal[x] :=
+                      SetValue(TJSONArray(AJsonValue).Get(x), AObj, nil, AParams[x].ParamType, ASkip);
+                  end;
+                end;
+
+                lEnumerator := lEnumMethod.Invoke(AValue, arrVal);
+              end;
+            end
+            else
+            begin
+              SetLength(arrVal, AJsonArray.Size);
+
+              for i := 0 to Length(arrVal)-1 do
+              begin
+                AJsonValue := AJsonArray.Get(i);
+
+                {TODO -oLinas -cGeneral : fix arguments}
+                //AParams[0].ParamType.AsInstance.
+                arrVal[i] := SetValue(AJsonValue, AObj, nil, AParams[0].ParamType, ASkip);
+
+
+                lEnumerator := lEnumMethod.Invoke(AValue, [arrVal[i]]);
+              end;
+            end;
+
+            if bCreated then
+            begin
+              Result := AValue;
+            end;
+            ASkip := True;
+          end;
+        end;
+      end
+      else
+      begin
+        ASkip := True;
+        PostError('Cannot assign array data to non array type');
+       // raise ESvSerializeException.Create('Cannot assign array data to non array type');
+      end;
+    end;
+  end;
+end;
+
 function TSvJsonSerializerFactory.DoSetFromNumber(AJsonNumber: TJSONNumber): TValue;
 var
   sVal: string;
@@ -261,6 +620,79 @@ begin
   else
   begin
     Result := AJsonNumber.AsDouble;
+  end;
+end;
+
+function TSvJsonSerializerFactory.DoSetFromObject(AJsonObject: TJSONObject; AType: TRttiType;
+  const AObj: TValue; AProp: TRttiProperty; var ASkip: Boolean): TValue;
+var
+  i: Integer;
+  FField: TRttiField ;
+  FRecord: TRttiRecordType ;
+  CurrProp: TRttiProperty;
+  obj: TObject;
+begin
+  if Assigned(AType) then
+  begin
+    case AType.TypeKind of
+      tkRecord:
+      begin
+        TValue.MakeWithoutCopy(nil, AType.Handle, Result);
+        FRecord := TSvRttiInfo.GetType(AType.Handle).AsRecord;
+
+        for i := 0 to AJsonObject.Size - 1 do
+        begin
+          //search for property name
+          FField := FindRecordFieldName(AJsonObject.Get(i).JsonString.Value, FRecord);
+          if Assigned(FField) then
+          begin
+            {DONE -oLinas -cGeneral : fix arguments}
+            FField.SetValue(Result.GetReferenceToRawData,
+              SetValue(AJsonObject.Get(i).JsonValue, AObj, nil, FField.FieldType, ASkip));
+          end;
+        end;
+      end;
+      tkClass:
+      begin
+        //AType := TSvRttiInfo.GetType(AType.Handle);
+        if Assigned(AProp) then
+        begin
+          Result := TSvRttiInfo.GetValue(AProp, AObj);
+          for i := 0 to AJsonObject.Size - 1 do
+          begin
+            CurrProp := AType.GetProperty(AJsonObject.Get(i).JsonString.Value);
+            if Assigned(CurrProp) then
+            begin
+              CurrProp.SetValue(Result.AsObject, SetValue(AJsonObject.Get(i).JsonValue, AObj, CurrProp,
+                CurrProp.PropertyType, ASkip));
+            end;
+          end;
+         //  Result := AProp.GetValue(AObj);
+        end
+        else
+        begin
+          {DONE -oLinas -cGeneral : create new class and set all props}
+          obj := TSvSerializer.CreateType(AType.Handle);
+          if Assigned(obj) then
+          begin
+            Result := obj;
+            for i := 0 to AJsonObject.Size - 1 do
+            begin
+              CurrProp := AType.GetProperty(AJsonObject.Get(i).JsonString.Value);
+              if Assigned(CurrProp) then
+              begin
+                CurrProp.SetValue(Result.AsObject, SetValue(AJsonObject.Get(i).JsonValue, AObj, CurrProp,
+                  CurrProp.PropertyType, ASkip));
+              end;
+            end;
+          end;
+        end;
+      end
+      else
+      begin
+        ASkip := True;
+      end;
+    end;
   end;
 end;
 
@@ -335,41 +767,18 @@ begin
 end;
 
 function TSvJsonSerializerFactory.GetValue(const AFrom: TValue; AProp: TRttiProperty): TJSONValue;
-var
-  i, iRecNo: Integer;
-  jArr: TJSONArray;
-  jObj: TJSONObject;
-  AVariant: Variant;
-  rType, lEnumType: TRttiType;
-  lEnumMethod, lMoveNextMethod: TRttiMethod;
-  lEnumerator: TValue;
-  lCurrentProp: TRttiProperty;
-  FRecord: TRttiRecordType;
-  FField: TRttiField;
-  bVal: Boolean;
-  ADst: TDataSet;
 begin
   if AFrom.IsEmpty then
     Result := TJSONNull.Create
   else
   begin
-    Result := nil;
+    //Result := nil;
     case AFrom.Kind of
       tkInteger: Result := TJSONNumber.Create(AFrom.AsInteger);
       tkInt64: Result := TJSONNumber.Create(AFrom.AsInt64);
       tkEnumeration:
       begin
-        if AFrom.TryAsType<Boolean>(bVal) then
-        begin
-          if bVal then
-            Result := TJSONTrue.Create
-          else
-            Result := TJSONFalse.Create;
-        end
-        else
-        begin
-          Result := TSvJsonString.Create(AFrom.ToString);
-        end;
+        Result := DoGetFromEnum(AFrom, AProp);
       end;
       tkSet:
       begin
@@ -380,126 +789,19 @@ begin
         Result := TSvJsonString.Create(AFrom.AsString);
       tkArray, tkDynArray:
       begin
-        Result := TJSONArray.Create();
-        jArr := TJSONArray(Result);
-        for i := 0 to AFrom.GetArrayLength - 1 do
-        begin
-          jArr.AddElement(GetValue(AFrom.GetArrayElement(i), nil));
-        end;
+        Result := DoGetFromArray(AFrom, AProp);
       end;
       tkVariant:
       begin
-        AVariant := AFrom.AsVariant;
-
-        if VarIsNull(AVariant) or VarIsEmpty(AVariant) then
-          Result := TJSONNull.Create
-        else
-          Result := TSvJsonString.Create(VarToStr(AVariant));
+        Result := DoGetFromVariant(AFrom, AProp);
       end;
       tkClass:
       begin
-        //support enumerable types
-        rType := TSvRttiInfo.GetType(AFrom.TypeInfo);
-        if Assigned(rType) and (AFrom.IsObject) then
-        begin
-          if AFrom.AsObject is TDataset then
-          begin
-           // Result := TJSONObject.Create;
-            ADst := TDataSet(AFrom.AsObject);
-
-            Result := TJSONArray.Create();
-           // TJSONObject(Result).AddPair(TJSONPair.Create(CT_DATASET_RECORDS,
-           //   Result));
-
-            ADst.DisableControls;
-            FormatSettings := FFormatSettings;
-            try
-              iRecNo := ADst.RecNo;
-              ADst.First;
-              while not ADst.Eof do
-              begin
-                jObj := TJSONObject.Create();
-                for i := 0 to ADst.Fields.Count - 1 do
-                begin
-                  if ADst.Fields[i].IsNull then
-                  begin
-                    jObj.AddPair(ADst.Fields[i].FieldName, TJSONNull.Create);
-                  end
-                  else
-                  begin
-                    jObj.AddPair(ADst.Fields[i].FieldName, TSvJsonString.Create(ADst.Fields[i].AsString));
-                  end;
-
-                end;
-                TJSONArray(Result).AddElement(jObj);
-                ADst.Next;
-              end;
-
-              ADst.RecNo := iRecNo;
-            finally
-              FormatSettings := FOldFormatSettings;
-              ADst.EnableControls;
-            end;
-
-          end
-          else
-          begin
-            lEnumMethod := rType.GetMethod('GetEnumerator');
-            if Assigned(lEnumMethod) then
-            begin
-              //enumerator exists
-              Result := TJSONArray.Create();
-              jArr := TJSONArray(Result);
-              lEnumerator := lEnumMethod.Invoke(AFrom,[]);
-              lEnumType :=  TSvRttiInfo.GetType(lEnumerator.TypeInfo);
-              lMoveNextMethod := lEnumType.GetMethod('MoveNext');
-              lCurrentProp := lEnumType.GetProperty('Current');
-              Assert(Assigned(LMoveNextMethod), 'MoveNext method not found');
-              Assert(Assigned(lCurrentProp), 'Current property not found');
-              while lMoveNextMethod.Invoke(lEnumerator.AsObject,[]).asBoolean do
-              begin
-                jArr.AddElement(GetValue(lCurrentProp.GetValue(lEnumerator.AsObject), lCurrentProp));
-              end;
-
-              if lEnumerator.IsObject then
-              begin
-                lEnumerator.AsObject.Free;
-              end;
-
-            end
-            else
-            begin
-              //other object types
-              Result := TJSONObject.Create;
-                //try to serialize
-              TJSONObject(Result).AddPair(TJSONPair.Create(CT_QUALIFIEDNAME,
-                TSvJsonString.Create(rType.QualifiedName)));
-
-              //serialize TDataset
-              for lCurrentProp in rType.GetProperties do
-              begin
-                if lCurrentProp.Visibility in [mvPublic,mvPublished] then
-                begin
-                  //try to serialize only published properties
-                  TJSONObject(Result).AddPair(TJSONPair.Create(lCurrentProp.Name,
-                    GetValue(lCurrentProp.GetValue(AFrom.AsObject), lCurrentProp)));
-                end;
-              end;
-            end;
-          end;
-        end;
+        Result := DoGetFromClass(AFrom, AProp);
       end;
       tkRecord:
       begin
-        rType := TSvRttiInfo.GetType(AFrom.TypeInfo);
-        FRecord := rType.AsRecord;
-        Result := TJSONObject.Create();
-        for FField in FRecord.GetFields do
-        begin
-          TJSONObject(Result).AddPair(TJSONPair.Create(FField.Name, 
-            GetValue(FField.GetValue(AFrom.GetReferenceToRawData), nil)));
-        end;
-
+        Result := DoGetFromRecord(AFrom, AProp);
       end
      { tkMethod: ;
       tkInterface: ;
@@ -514,7 +816,6 @@ begin
       end;
     end;
   end;
-
 end;
 
 procedure TSvJsonSerializerFactory.SerializeObject(const AKey: string; const obj: TValue;
@@ -604,38 +905,13 @@ begin
           end;
         end;
       end;
-
-
     end;
-
-    
   end;
 end;
 
 function TSvJsonSerializerFactory.SetValue(const AFrom: TJSONValue; const AObj: TValue; AProp: TRttiProperty; AType: TRttiType; var Skip: Boolean): TValue;
-var
-  i: Integer;
-  sVal: string;
-  arrVal: array of TValue;
-  rType: TRttiType;
-  lEnumMethod : TRttiMethod;
-  lEnumerator, AValue : TValue;
-  lClearMethod : TRttiMethod;
-  FField: TRttiField ;
-  FRecord: TRttiRecordType ;
-  CurrProp: TRttiProperty;
-  AParams: TArray<TRttiParameter>;
-  AJsonValue: TJSONValue;
-  x: Integer;
-  ADst: TDataSet;
-  jArr: TJSONArray;
-  fld: TField;
-  bCreated: Boolean;
-  obj: TObject;
 begin
   Skip := False;
-  bCreated := False;
-  AValue := TValue.Empty;
   if Assigned(AFrom) then
   begin
     if AFrom is TJSONNumber then
@@ -660,254 +936,11 @@ begin
     end
     else if AFrom is TJSONArray then
     begin
-      if Assigned(AType) then
-      begin
-        case AType.TypeKind of
-          tkArray:
-          begin
-            SetLength(arrVal, TJSONArray(AFrom).Size);
-
-            for i := 0 to Length(arrVal)-1 do
-            begin
-              arrVal[i] := SetValue(TJSONArray(AFrom).Get(i), AObj, AProp, TRttiArrayType(AType).ElementType, Skip);
-            end;
-
-            Result := TValue.FromArray(AType.Handle, arrVal);
-          end;
-          tkDynArray:
-          begin
-            SetLength(arrVal, TJSONArray(AFrom).Size);
-
-            for i := 0 to Length(arrVal)-1 do
-            begin
-              arrVal[i] := SetValue(TJSONArray(AFrom).Get(i), AObj, AProp, TRttiDynamicArrayType(AType).ElementType, Skip);
-            end;
-
-            Result := TValue.FromArray(AType.Handle, arrVal);
-          end;
-          tkClass:
-          begin
-            rType := TSvRttiInfo.GetType(AType.Handle);
-
-            if Assigned(rType) then
-            begin
-              if Assigned(AProp) then
-              begin
-                Result := TSvRttiInfo.GetValue(AProp, AObj);
-                if Result.AsObject is TDataSet then
-                begin
-                  //deserialize TDataSet
-                  ADst := TDataSet(Result.AsObject);
-
-                  jArr := TJSONArray(AFrom);
-                  if Assigned(jArr) then
-                  begin
-                    ADst.DisableControls;
-                    FormatSettings := FFormatSettings;
-                    try
-                      for i := 0 to jArr.Size - 1 do
-                      begin
-                        try
-                          ADst.Append;
-
-                          for x := 0 to TJSONObject(jArr.Get(i)).Size - 1 do
-                          begin
-                            //get fieldname from json object
-                            sVal := TJSONObject(jArr.Get(i)).Get(x).JsonString.Value;
-                            fld := ADst.FindField(sVal);
-                            if Assigned(fld) then
-                            begin
-                              //check if not null
-                              if TJSONObject(jArr.Get(i)).Get(x).JsonValue is TJSONNull then
-                                fld.Clear
-                              else
-                                fld.AsString := TJSONObject(jArr.Get(i)).Get(x).JsonValue.Value;
-                            end;
-                          end;
-
-                          ADst.Post;
-                        except
-                          on E:Exception do
-                          begin
-                            PostError(E.Message);
-                          end;
-                        end;
-                      end;
-
-                    finally
-                      ADst.EnableControls;
-                      FormatSettings := FOldFormatSettings;
-                    end;
-                    Exit;
-                  end;
-
-                end;
-              end
-              else
-              begin
-                //if AProp not assigned then we must create it
-                if rType.IsInstance then
-                begin
-                  obj := TSvSerializer.CreateType(rType.Handle);
-                  if Assigned(obj) then
-                  begin
-                    AValue := obj;
-                    bCreated := True;
-                  end;
-                end;
-              end;
-
-              lEnumMethod := TSvRttiInfo.GetBasicMethod('Add', rType);
-              if Assigned(lEnumMethod) and ( (Assigned(AProp)) or not (AValue.IsEmpty)  ) then
-              begin
-                if AValue.IsEmpty and Assigned(AProp) then
-                  AValue := TSvRttiInfo.GetValue(AProp, AObj);
-               // AValue := AProp.GetValue(AObj);
-                lClearMethod := TSvRttiInfo.GetBasicMethod('Clear', rType);
-                if Assigned(lClearMethod) and (Length(lClearMethod.GetParameters) = 0) then
-                begin
-                  lClearMethod.Invoke(AValue, []);
-                end;
-
-                AParams := lEnumMethod.GetParameters;
-
-                if Length(AParams) > 1 then
-                begin
-                  SetLength(arrVal, Length(AParams));
-                  //probably we are dealing with key value pair class like TDictionary
-
-                  for i := 0 to TJSONArray(AFrom).Size - 1 do
-                  begin
-                    AJsonValue := TJSONArray(AFrom).Get(i);
-
-
-                    Assert(Length(AParams) = TJSONObject(AJsonValue).Size, 'Parameters count differ');
-                    if AJsonValue is TJSONObject then
-                    begin
-                      for x := 0 to TJSONObject(AJsonValue).Size - 1 do
-                      begin
-                        arrVal[x] := SetValue(TJSONObject(AJsonValue).Get(x).JsonValue,
-                          AObj, nil, AParams[x].ParamType, Skip);
-                      end;
-                    end
-                    else if AJsonValue is TJSONArray then
-                    begin
-                      for x := 0 to TJSONArray(AJsonValue).Size - 1 do
-                      begin
-                        arrVal[x] :=
-                          SetValue(TJSONArray(AJsonValue).Get(x), AObj, nil, AParams[x].ParamType, Skip);
-                      end;
-                    end
-                    else
-                    begin
-                      // must not happen
-                      //arrVal[0] := SetValue(TJSONArray(AFrom).Get(i), AObj, nil, AParams[j], Skip);
-                    end;
-
-                    lEnumerator := lEnumMethod.Invoke(AValue, arrVal);
-                  end;
-                end
-                else
-                begin
-                  SetLength(arrVal, TJSONArray(AFrom).Size);
-
-                  for i := 0 to Length(arrVal)-1 do
-                  begin
-                    AJsonValue := TJSONArray(AFrom).Get(i);
-
-                    {TODO -oLinas -cGeneral : fix arguments}
-                    //AParams[0].ParamType.AsInstance.
-                    arrVal[i] := SetValue(AJsonValue, AObj, nil, AParams[0].ParamType, Skip);
-
-
-                    lEnumerator := lEnumMethod.Invoke(AValue, [arrVal[i]]);
-                  end;
-                end;
-
-                if bCreated then
-                begin
-                  Result := AValue;
-                end;
-
-                Skip := True;
-
-              end;
-
-            end;
-          end
-          else
-          begin
-            Skip := True;
-            PostError('Cannot assign array data to non array type');
-           // raise ESvSerializeException.Create('Cannot assign array data to non array type');
-          end;
-        end;
-      end;
+      Result := DoSetFromArray(TJSONArray(AFrom), AType, AObj, AProp, Skip);
     end
     else if AFrom is TJSONObject then
     begin
-      if Assigned(AType) then
-      begin
-        case AType.TypeKind of
-          tkRecord:
-          begin
-            TValue.MakeWithoutCopy(nil, AType.Handle, Result);
-            FRecord := TSvRttiInfo.GetType(AType.Handle).AsRecord;
-
-            for i := 0 to TJSONObject(AFrom).Size - 1 do
-            begin
-              //search for property name
-              FField := FindRecordFieldName(TJSONObject(AFrom).Get(i).JsonString.Value, FRecord);
-              if Assigned(FField) then
-              begin
-                {DONE -oLinas -cGeneral : fix arguments}
-                FField.SetValue(Result.GetReferenceToRawData,
-                  SetValue(TJSONObject(AFrom).Get(i).JsonValue, AObj, nil, FField.FieldType, Skip));
-              end;
-            end;
-          end;
-          tkClass:
-          begin
-            rType := TSvRttiInfo.GetType(AType.Handle);
-            if Assigned(AProp) then
-            begin
-              Result := TSvRttiInfo.GetValue(AProp, AObj);
-              for i := 0 to TJSONObject(AFrom).Size - 1 do
-              begin
-                CurrProp := rType.GetProperty(TJSONObject(AFrom).Get(i).JsonString.Value);
-                if Assigned(CurrProp) then
-                begin
-                  CurrProp.SetValue(Result.AsObject, SetValue(TJSONObject(AFrom).Get(i).JsonValue, AObj, CurrProp,
-                    CurrProp.PropertyType, Skip));
-                end;
-              end;
-             //  Result := AProp.GetValue(AObj);
-            end
-            else
-            begin
-              {DONE -oLinas -cGeneral : create new class and set all props}
-              obj := TSvSerializer.CreateType(rType.Handle);
-              if Assigned(obj) then
-              begin
-                Result := obj;
-                for i := 0 to TJSONObject(AFrom).Size - 1 do
-                begin
-                  CurrProp := rType.GetProperty(TJSONObject(AFrom).Get(i).JsonString.Value);
-                  if Assigned(CurrProp) then
-                  begin
-                    CurrProp.SetValue(Result.AsObject, SetValue(TJSONObject(AFrom).Get(i).JsonValue, AObj, CurrProp,
-                      CurrProp.PropertyType, Skip));
-                  end;
-                end;
-              end;
-            end;
-          end
-          else
-          begin
-            Skip := True;
-          end;
-        end;
-      end;
+      Result := DoSetFromObject(TJSONObject(AFrom), AType, AObj, AProp, Skip);
     end
     else
     begin
