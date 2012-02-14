@@ -222,7 +222,8 @@ type
 
     function GetErrors(): TArray<string>;
 
-    class function CreateType<T: class>: T;
+    class function CreateType<T: class>: T; overload;
+    class function CreateType(ATypeInfo: PTypeInfo): TObject; overload;
 
     property ErrorCount: Integer read GetErrorCount;
     property Factory: TSvSerializerFactory read FFactory;
@@ -345,13 +346,33 @@ begin
   end;
 end;
 
+class function TSvSerializer.CreateType(ATypeInfo: PTypeInfo): TObject;
+var
+  rType: TRttiType;
+  AMethCreate: TRttiMethod;
+  instanceType: TRttiInstanceType;
+begin
+  rType := TSvRttiInfo.GetType(ATypeInfo);
+
+  for AMethCreate in rType.GetMethods do
+  begin
+    if (AMethCreate.IsConstructor) and (Length(AMethCreate.GetParameters) = 0) then
+    begin
+      instanceType := rType.AsInstance;
+
+      Result := AMethCreate.Invoke(instanceType.MetaclassType, []).AsObject;
+      Exit;
+    end;
+  end;
+  Result := nil;
+end;
+
 class function TSvSerializer.CreateType<T>: T;
 var
   AValue: TValue;
   rType: TRttiType;
   AMethCreate: TRttiMethod;
   instanceType: TRttiInstanceType;
-  iParams: Integer;
 begin
   rType := TSvRttiInfo.GetType(TypeInfo(T));
 
