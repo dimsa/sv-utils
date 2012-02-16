@@ -196,6 +196,47 @@ type
 
     property IsThreadSafe: Boolean read GetIsThreadSafe write SetIsThreadSafe;
   end;
+
+  ISvLazy<T> = interface
+    ['{433C34BB-E5F3-4594-814C-70F02C415CB8}']
+    function GetValue: T;
+    property Value: T read GetValue;
+  end;
+
+  TSvLazy<T> = class(TInterfacedObject, ISvLazy<T>)
+  private
+    FValueFactory: TFunc<T>;
+    FValueCreated: Boolean;
+    FOwnsObjects: Boolean;
+    FValue: T;
+    function GetValue: T;
+  public
+    constructor Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
+    destructor Destroy; override;
+
+    property Value: T read GetValue;
+  end;
+  /// <summary>
+  /// Represents lazy variable
+  /// </summary>
+  SvLazy<T> = record
+  private
+    FLazy: ISvLazy<T>;
+    function GetValue: T;
+  public
+    /// <summary>
+    /// Initializes lazy value with anonymous getValue factory
+    /// </summary>
+    /// <param name="AValueFactory">Anonymous method which gets value</param>
+    /// <param name="AOwnsObjects">Boolean property to specify if lazy value should free it's value when it goes out of scope</param>
+    constructor Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
+
+    class operator Implicit(const ALazy: SvLazy<T>): T; inline;
+    class operator Implicit(const AValueFactory: TFunc<T>): SvLazy<T>; inline;
+
+    property Value: T read GetValue;
+  end;
+
 implementation
 
 { TAbstractFactory<TKey, TBaseType> }
@@ -488,6 +529,59 @@ procedure TSingleton<T>.SetIsThreadSafe(const Value: Boolean);
 begin
   if Value <> FIsThreadSafe then
     FIsThreadSafe := Value;
+end;
+
+{ TSvLazy<T> }
+
+constructor TSvLazy<T>.Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean);
+begin
+  inherited Create;
+  FValueFactory := AValueFactory;
+  FValueCreated := False;
+  FOwnsObjects := AOwnsObjects;
+end;
+
+destructor TSvLazy<T>.Destroy;
+begin
+  if FOwnsObjects and FValueCreated then
+  begin
+    //free value
+    TSvRtti.DestroyClass<T>(FValue);
+  end;
+  inherited;
+end;
+
+function TSvLazy<T>.GetValue: T;
+begin
+  if not FValueCreated then
+  begin
+    FValue := FValueFactory();
+    FValueCreated := True;
+  end;
+
+  Result := FValue;
+end;
+
+{ SvLazy<T> }
+
+constructor SvLazy<T>.Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean);
+begin
+  FLazy := TSvLazy<T>.Create(AValueFactory, AOwnsObjects);
+end;
+
+function SvLazy<T>.GetValue: T;
+begin
+  Result := FLazy.Value;
+end;
+
+class operator SvLazy<T>.Implicit(const ALazy: SvLazy<T>): T;
+begin
+  Result := ALazy.Value;
+end;
+
+class operator SvLazy<T>.Implicit(const AValueFactory: TFunc<T>): SvLazy<T>;
+begin
+  Result := SvLazy<T>.Create(AValueFactory);
 end;
 
 end.
