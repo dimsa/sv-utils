@@ -51,6 +51,7 @@ type
     /// </summary>
     /// <param name="AStream">Stream containing image</param>
     procedure LoadFromStreamSmart(AStream: TStream);
+    procedure LoadFromFileSmart(const AFilename: string);
   end;
 
 
@@ -147,6 +148,19 @@ begin
   finally
     Stream.Free;
     Graphic.Free;
+  end;
+end;
+
+procedure TPictureHelper.LoadFromFileSmart(const AFilename: string);
+var
+  fs: TFileStream;
+begin
+  fs := TFileStream.Create(AFilename, fmOpenRead or fmShareDenyNone);
+  try
+    fs.Position := 0;
+    LoadFromStreamSmart(fs);
+  finally
+    fs.Free;
   end;
 end;
 
