@@ -66,6 +66,11 @@ type
     procedure TestGetInstance;
   end;
 
+  TestSvLazy = class(TTestCase)
+  published
+    procedure TestLazy;
+  end;
+
 implementation
 
 procedure TestTFactory.SetUp;
@@ -354,10 +359,64 @@ end;
 
 {$HINTS ON}
 
+{ TestSvLazy }
+
+procedure TestSvLazy.TestLazy;
+var
+  lazy1: SvLazy<TStrings>;
+  lazy2: SvLazy<TStrings>;
+  lazy3: SvLazy<TStrings>;
+  iCounter: Integer;
+begin
+  iCounter := 0;
+  lazy1 :=
+    function: TStrings
+    begin
+      Result := TStringList.Create;
+      Sleep(100);
+      Result.Add('Test1');
+      Inc(iCounter);
+    end;
+
+  lazy2 :=
+    function: TStrings
+    begin
+      Result := TStringList.Create;
+      Sleep(100);
+      Result.Add('Test2');
+      Inc(iCounter);
+    end;
+
+  CheckEquals(0, iCounter);
+  CheckTrue(Assigned(lazy1.Value));
+  CheckEqualsString('Test1', lazy1.Value[0]);
+  CheckEquals(1, iCounter);
+  lazy1.Value.Free;
+
+  CheckTrue(Assigned(lazy2.Value));
+  CheckEqualsString('Test2', lazy2.Value[0]);
+  CheckEquals(2, iCounter);
+  lazy2.Value.Free;
+  // create with aownsobjects = true. StringList will be freed when value goes out of scope
+  lazy3.Create(
+    function: TStrings
+    begin
+      Result := TStringList.Create;
+      Sleep(100);
+      Result.Add('Test3');
+      Inc(iCounter);
+    end, True);
+
+  CheckTrue(Assigned(lazy3.Value));
+  CheckEqualsString('Test3', lazy3.Value[0]);
+  CheckEquals(3, iCounter);
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestTFactory.Suite);
   RegisterTest(TestTMultiton.Suite);
   RegisterTest(TestTSingleton.Suite);
+  RegisterTest(TestSvLazy.Suite);
 end.
 

@@ -36,6 +36,7 @@ type
   TSvRtti = class abstract
   public
     class function CreateNewClass<T>: T;
+    class procedure DestroyClass<T>(var AObject: T);
   end;
 
 implementation
@@ -59,6 +60,25 @@ begin
 
         Result := AMethCreate.Invoke(instanceType.MetaclassType, []).AsType<T>;
 
+        Break;
+      end;
+    end;
+  end;
+end;
+
+class procedure TSvRtti.DestroyClass<T>(var AObject: T);
+var
+  rType: TRttiType;
+  AMethDestroy: TRttiMethod;
+begin
+  rType := TRttiContext.Create.GetType(TypeInfo(T));
+  if rType.IsInstance then
+  begin
+    for AMethDestroy in rType.GetMethods do
+    begin
+      if (AMethDestroy.IsDestructor) and (Length(AMethDestroy.GetParameters) = 0) then
+      begin
+        AMethDestroy.Invoke(TValue.From<T>(AObject), []);
         Break;
       end;
     end;
