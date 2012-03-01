@@ -29,7 +29,9 @@ uses
   TestSvHelpers in 'TestSvHelpers.pas',
   SvClasses in '..\Core\SvClasses.pas',
   TestSvClasses in 'TestSvClasses.pas',
-  SvRttiUtils in '..\Core\SvRttiUtils.pas';
+  SvRttiUtils in '..\Core\SvRttiUtils.pas',
+  SvContainers in '..\Core\SvContainers.pas',
+  TestSvContainers in 'TestSvContainers.pas';
 
 {$R *.RES}
 
