@@ -57,6 +57,8 @@
 			<DCCReference Include="..\Core\SvClasses.pas"/>
 			<DCCReference Include="TestSvClasses.pas"/>
 			<DCCReference Include="..\Core\SvRttiUtils.pas"/>
+			<DCCReference Include="..\Core\SvContainers.pas"/>
+			<DCCReference Include="TestSvContainers.pas"/>
 			<RcItem Include="..\SQLite3\Bin\Sunset.jpg">
 				<ResourceType>RCDATA</ResourceType>
 				<ResourceId>JpgImage_1</ResourceId>

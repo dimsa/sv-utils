@@ -85,10 +85,26 @@ type
     property InvData: TClientDataset read FInvData write FInvData;
   end;
 
+  TSimpleInside = class
+  private
+    FStringList: TStringList;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    [SvSerialize]
+    property StringList: TStringList read FStringList write FStringList;
+  end;
+
   TSimple = class
   private
     FList: TArray<string>;
+    FAList: TObjectList<TSimpleInside>;
   public
+    constructor Create;
+    destructor Destroy; override;
+
+   // property AList: TObjectList<TSimpleInside> read FAList write FAList;
+    [SvSerialize]
     property List: TArray<string> read FList write FList;
   end;
 
@@ -182,6 +198,7 @@ type
     procedure TestEscapeValue();
     procedure TestJQGrid();
     procedure TestSQLiteSerializeDeserialize();
+    procedure TestSimpleClassInside;
   end;
 
 implementation
@@ -744,6 +761,45 @@ begin
   CheckEquals(PROP_DOUBLE, ARec.ADouble);
 end;
 
+procedure TestTSvJsonSerializerFactory.TestSimpleClassInside;
+var
+  obj: TSimple;
+  inside: TSimpleInside;
+  i: Integer;
+begin
+  obj := TSimple.Create;
+
+  FILE_SERIALIZE := 'testSimpleInside.json';
+  //set properties
+  for i := 0 to 3 - 1 do
+  begin
+    inside := TSimpleInside.Create;
+    inside.StringList.Add(PROP_STRING);
+    inside.StringList.Add(PROP_STRING);
+    inside.StringList.Add(PROP_STRING);
+   // obj.AList.Add(inside);
+  end;
+
+  FSerializer.AddObject('', obj);
+
+  FSerializer.Serialize(FILE_SERIALIZE);
+  FSerializer.Free;
+
+  FSerializer := TSvSerializer.Create();
+  obj.Free;
+  obj := TSimple.Create;
+  FSerializer.AddObject('', obj);
+  try
+    FSerializer.DeSerialize(FILE_SERIALIZE);
+
+ //   CheckEquals(3, obj.AList.Count);
+   // CheckEquals(3, obj.AList[0].StringList.Count);
+  //  CheckEqualsString(PROP_STRING,  obj.AList[0].StringList[0]);
+  finally
+    obj.Free;
+  end;
+end;
+
 procedure TestTSvJsonSerializerFactory.TestSQLiteSerializeDeserialize;
 begin
   FSerializer.Free;
@@ -844,6 +900,32 @@ begin
   finally
     FSer.Free;
   end;
+end;
+
+{ TSimpleInside }
+
+constructor TSimpleInside.Create;
+begin
+  FStringList := TStringList.Create;
+end;
+
+destructor TSimpleInside.Destroy;
+begin
+  FStringList.Free;
+  inherited;
+end;
+
+{ TSimple }
+
+constructor TSimple.Create;
+begin
+  FAList := TObjectList<TSimpleInside>.Create(True);
+end;
+
+destructor TSimple.Destroy;
+begin
+  FAList.Free;
+  inherited;
 end;
 
 initialization
