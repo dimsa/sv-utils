@@ -68,7 +68,7 @@ type
     function Modify(Value, Hash: Cardinal; const Data: T): Boolean;
     function ROR(Value: Cardinal): Cardinal;
     function RORN(Value: Cardinal; Level: Integer): Cardinal;
-    function Traverse(AProc: TSvStringTrieIterateRef<T>): Boolean; overload;
+    function Traverse(AProc: TSvStringTrieIterateRef<T>): Boolean;
   public
     constructor Create(AOwner: TObject);
     destructor Destroy; override;
@@ -109,27 +109,7 @@ type
 
 
     property OnFreeItem: TSvFreeItemEvent<T> read FOnFreeItem write FOnFreeItem;
-  type
-    TEnumerator = class(TEnumerator<T>)
-    private
-      FTrie: THashTrie<T>;
-      FIndex: Integer;
-      FMax: Integer;
-      FCurrIndex: Integer;
-      FCurrObj: TObject;
-      FRoot: THashTreeItem<T>;
-      FLinkedItem: THashLinkedItem<T>;
-      function GetCurrent: T;
-    protected
-      function DoGetCurrent: T; override;
-      function DoMoveNext: Boolean; override;
-    public
-      constructor Create(ATrie: THashTrie<T>);
-      property Current: T read GetCurrent;
-      function MoveNext: Boolean;
-    end;
 
-    //function GetEnumerator: TEnumerator; reintroduce;
   end;
 
 
@@ -147,6 +127,26 @@ type
     procedure DestroyItem(var Value: Cardinal; var Data: T); override;
     function CompareValue(Value1, Value2: Cardinal): Boolean; override;
     function HashStr(const S: string): Cardinal;
+  public
+    type
+      TPairEnumerator = class(TEnumerator<TPair<string, T>>)
+      private
+        FTrie: TSvStringTrie<T>;
+        FIndex: Integer;
+        FItems: TArray<TPair<string, T>>;
+        function GetCurrent: TPair<string, T>;
+      protected
+        function DoGetCurrent: TPair<string, T>; override;
+        function DoMoveNext: Boolean; override;
+      public
+        constructor Create(ATrie: TSvStringTrie<T>);
+        destructor Destroy; override;
+
+        property Current: TPair<string, T> read GetCurrent;
+        function MoveNext: Boolean;
+      end;
+
+    function GetEnumerator: TPairEnumerator; reintroduce;
   public
     procedure Add(const S: string; const Data: T);
     procedure AddOrSetValue(const S: string; const Data: T);
@@ -627,7 +627,8 @@ var
   LinkedItem: THashLinkedItem<T>;
 begin
   Result := False;
-  for I := 0 to High(FItems) do
+  for I := Low(FItems) to High(FItems) do
+  begin
     if Assigned(FItems[I]) then
     begin
       if FItems[I] is THashTreeItem<T> then
@@ -645,6 +646,7 @@ begin
       if Result then
         Break;
     end;
+  end;
 end;
 
 { THashTrie<T> }
@@ -737,12 +739,6 @@ begin
     TreeStat(FRoot, MaxLevel, PeakCount, FillCount, EmptyCount, LengthStatistics);
 end;
 
-{
-function THashTrie<T>.GetEnumerator: TEnumerator;
-begin
-  Result := TEnumerator.Create(Self);
-end;
-}
 
 { TStringHashTrie<T> }
 
@@ -806,6 +802,11 @@ begin
   Value := 0;
   {DONE -oLinas -cGeneral : add event on free item}
 
+end;
+
+function TSvStringTrie<T>.GetEnumerator: TPairEnumerator;
+begin
+  Result := TPairEnumerator.Create(Self);
 end;
 
 function TSvStringTrie<T>.GetKeys(const AData: T): string;
@@ -876,151 +877,54 @@ begin
   AddOrSetValue(AKey, Value);
 end;
 
-{ THashTrie<T>.TEnumerator }
+{ TSvStringTrie<T>.TPairEnumerator }
 
-constructor THashTrie<T>.TEnumerator.Create(ATrie: THashTrie<T>);
+constructor TSvStringTrie<T>.TPairEnumerator.Create(ATrie: TSvStringTrie<T>);
+var
+  ix: Integer;
 begin
   inherited Create;
   FTrie := ATrie;
-  FIndex := 0;
-  FRoot := FTrie.FRoot;
-  FCurrObj := FRoot;
- // FCurrObj := FRoot.FItems[FIndex];
-  FLinkedItem := nil;
-  FMax := FTrie.Count;
-  FCurrIndex := -1;
+  FIndex := -1;
+
+  SetLength(FItems, FTrie.Count);
+  ix := 0;
+  //enumerate
+  FTrie.IterateOver(
+    procedure(const AKey: string; const AData: T; var Abort: Boolean)
+    begin
+      FItems[ix].Key := AKey;
+      FItems[ix].Value := AData;
+      Inc(ix);
+    end);
 end;
 
-function THashTrie<T>.TEnumerator.DoGetCurrent: T;
+destructor TSvStringTrie<T>.TPairEnumerator.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TSvStringTrie<T>.TPairEnumerator.DoGetCurrent: TPair<string, T>;
 begin
   Result := GetCurrent;
-
 end;
 
-function THashTrie<T>.TEnumerator.DoMoveNext: Boolean;
+function TSvStringTrie<T>.TPairEnumerator.DoMoveNext: Boolean;
 begin
   Result := MoveNext;
 end;
 
-function THashTrie<T>.TEnumerator.GetCurrent: T;
+function TSvStringTrie<T>.TPairEnumerator.GetCurrent: TPair<string, T>;
 begin
-  Result := FLinkedItem.FData;
-  Inc(FCurrIndex);
+  Result := FItems[FIndex];
 end;
 
-function THashTrie<T>.TEnumerator.MoveNext: Boolean;
-var
-  ix, FOldIndex: Integer;
-  FOldObj: TObject;
-  FOldRoot: THashTreeItem<T>;
-  bFound: Boolean;
- // FOldLinkedItem: THashLinkedItem<T>;
+function TSvStringTrie<T>.TPairEnumerator.MoveNext: Boolean;
 begin
-  Result := (FCurrIndex < FMax - 1 ) ;
-  if not Result then
-    Exit;
-
-  bFound := False;
-
-  while not bFound do
-  begin
-
-    if Assigned(FLinkedItem) then
-    begin
-      FLinkedItem := FLinkedItem.FNext;
-      Result := Assigned(FLinkedItem);
-      if Result then
-        Exit
-      else
-      begin
-        FCurrObj := nil;
-        while not Assigned(FCurrObj) and (FIndex <= High(FRoot.FItems)) do
-        begin
-
-          FCurrObj := FRoot.FItems[FIndex];
-          Inc(FIndex);
-        end;
-      end;
-    end;
-
-    if Assigned(FCurrObj) then
-    begin
-      if FCurrObj is THashTreeItem<T> then
-      begin
-        ix := -1;
-        //set new root
-        FRoot := THashTreeItem<T>(FCurrObj);
-        //init index to 0, because we will start recursion
-      //  FIndex := 0;
-        //get new item
-        FCurrObj := nil;
-        while not Assigned(FCurrObj) and (ix <= High(FRoot.FItems)) do
-        begin
-          Inc(ix);
-          FCurrObj := FRoot.FItems[ix];
-        end;
-
-
-        //save old state
-        FOldRoot := FRoot;
-        FOldObj := FCurrObj;
-       // FOldIndex := FIndex;
-        FLinkedItem := nil;
-        //do recursion
-        Result := MoveNext;
-
-        // FIndex := ix;
-        Inc(ix);
-
-        FRoot := FOldRoot;
-        FCurrObj := FOldObj;
-        FIndex := ix;
-        //restore old state
-        if Result then
-        begin
-
-          Exit;
-        end;
-
-        bFound := not ( ix <= High(FRoot.FItems) ) ;
-      //  FLinkedItem := nil;
-      //  FLinkedItem := FOldLinkedItem;
-      end
-      else
-      begin
-        FLinkedItem := THashLinkedItem<T>(FCurrObj);
-       // Inc(FIndex);
-        Result := Assigned(FLinkedItem.FNext);
-        bFound := Result;
-      //  if not Result then
-     //   begin
-     //     Result := ( FIndex < High(FRoot.FItems) ) ;
-
-         { FCurrObj := FRoot.FItems[FIndex];
-          FOldObj := FCurrObj;
-          FOldRoot := FRoot;
-          Result := MoveNext;
-
-          FRoot := FOldRoot;
-          FCurrObj := FOldObj; }
-      //  end;
-       // FCurrObj := FLinkedItem.FNext;
-      end;
-    end
-    else
-    begin
-      FIndex := -1;
-      while not Assigned(FCurrObj) and (FIndex <= High(FRoot.FItems)) do
-      begin
-        Inc(FIndex);
-        FCurrObj := FRoot.FItems[FIndex];
-      end;
-      //FCurrObj := FRoot.FOwner;
-      bFound := not Assigned(FCurrObj);
-    end;
-
-  end;
-
+  if FIndex >= Length(FItems) then
+    Exit(False);
+  Inc(FIndex);
+  Result := FIndex < Length(FItems);
 end;
 
 { TSvStringObjectTrie<T> }
