@@ -99,7 +99,7 @@ begin
 
         if Assigned(AJsonVal) and (AJsonVal is TJSONObject) then
         begin
-          FMainObj := TJSONObject(AJsonVal);
+          FMainObj := TJSONObject(AJsonVal);          
         end;
       end;
       
@@ -422,10 +422,8 @@ var
   obj: TObject;
   AValue, lEnumerator: TValue;
   bCreated: Boolean;
-  lEnumMethod, lClearMethod, lGetEnumMethod, lGetCurrentMethod: TRttiMethod;
+  lEnumMethod, lClearMethod: TRttiMethod;
   AParams: TArray<TRttiParameter>;
-  lEnumType: TRttiType;
-  lCurrentProp: TRttiProperty;
 begin
   bCreated := False;
   AValue := TValue.Empty;
@@ -518,9 +516,6 @@ begin
               if Assigned(obj) then
               begin
                 AValue := obj;
-
-              //  Result := AValue;
-
                 bCreated := True;
               end;
             end;
@@ -574,19 +569,6 @@ begin
             else
             begin
               SetLength(arrVal, AJsonArray.Size);
-             { lCurrentProp := nil;
-              lGetEnumMethod := TSvRttiInfo.GetBasicMethod('GetEnumerator', AType);
-              lGetCurrentMethod := TSvRttiInfo.GetBasicMethod('GetCurrent', AType);
-              if Assigned(lGetEnumMethod) then
-              begin
-                //enumerator exists
-                lEnumerator := lGetEnumMethod.Invoke(AValue,[]);
-                lEnumType :=  TSvRttiInfo.GetType(lEnumerator.TypeInfo);
-                lCurrentProp := lEnumType.GetProperty('Current');
-              end;   }
-
-
-
 
               for i := 0 to Length(arrVal)-1 do
               begin
@@ -594,17 +576,6 @@ begin
 
                 {TODO -oLinas -cGeneral : fix arguments}
                 //AParams[0].ParamType.AsInstance.
-              {  if Assigned(lCurrentProp) then
-                begin
-                  if lCurrentProp.PropertyType.IsInstance then
-                  begin
-                    lEnumerator := TSvSerializer.CreateType(lCurrentProp.PropertyType.Handle);
-                    Result := SetValue(AJsonValue, lEnumerator, lCurrentProp, lCurrentProp.PropertyType, ASkip);
-                  end;
-                //  AValue := SetValue(AJsonValue, AValue, lCurrentProp, lCurrentProp.PropertyType, ASkip);
-                end;}
-
-             //   arrVal[i] := Result;
                 arrVal[i] := SetValue(AJsonValue, AObj, nil, AParams[0].ParamType, ASkip);
 
 
