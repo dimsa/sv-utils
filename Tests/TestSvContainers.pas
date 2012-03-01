@@ -119,29 +119,26 @@ end;
 
 procedure TestTSvStringTrie.TestEnumerator;
 var
-  rec: TestRec;
-  ix, i: Integer;
+  ix: Integer;
+  pair: TPair<string,TestRec>;
   dict: TDictionary<Integer, Boolean>;
 begin
   TestAdd;
-
-{  dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
+  ix := 0;
+  dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
   try
-
-    ix := 0;
-    for rec in FTrie do
+    for pair in FTrie do
     begin
-     // CheckEquals(ix, rec.ID);
-      i := rec.ID;
-      CheckFalse(dict.ContainsKey(i), Format('Duplicated key on iteration %D',[ix]));
-      dict.Add(i, True);
+      CheckFalse(dict.ContainsKey(pair.Value.ID), Format('Duplicated key on iteration %D',[ix]));
+      dict.Add(pair.Value.ID, True);
 
       Inc(ix);
     end;
+
     CheckEquals(ix, ITER_SIZE);
   finally
     dict.Free;
-  end;   }
+  end;
 end;
 
 procedure TestTSvStringTrie.TestFind;
