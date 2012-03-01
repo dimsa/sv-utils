@@ -50,11 +50,19 @@ type
     procedure TestDelete();
     procedure TestFind();
     procedure TestEnumerator();
+    procedure TestIterateOver();
+    procedure TestStatistics();
   end;
 
 implementation
 
+uses
+  Generics.Collections;
+
 { TestTSvStringTrie }
+
+{$HINTS OFF}
+{$WARNINGS OFF}
 
 procedure TestTSvStringTrie.SetUp;
 begin
@@ -113,16 +121,27 @@ procedure TestTSvStringTrie.TestEnumerator;
 var
   rec: TestRec;
   ix, i: Integer;
+  dict: TDictionary<Integer, Boolean>;
 begin
   TestAdd;
-  ix := 0;
-  for rec in FTrie do
-  begin
-   // CheckEquals(ix, rec.ID);
-    i := rec.ID;
-    Inc(ix);
-  end;
-  CheckEquals(ix, ITER_SIZE);
+
+{  dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
+  try
+
+    ix := 0;
+    for rec in FTrie do
+    begin
+     // CheckEquals(ix, rec.ID);
+      i := rec.ID;
+      CheckFalse(dict.ContainsKey(i), Format('Duplicated key on iteration %D',[ix]));
+      dict.Add(i, True);
+
+      Inc(ix);
+    end;
+    CheckEquals(ix, ITER_SIZE);
+  finally
+    dict.Free;
+  end;   }
 end;
 
 procedure TestTSvStringTrie.TestFind;
@@ -136,7 +155,7 @@ begin
   begin
     rec.ID := -1;
     rec.Name := '';
-    CheckTrue( FTrie.Find(IntToStr(i), rec));
+    CheckTrue( FTrie.TryGetValue(IntToStr(i), rec));
     CheckEquals(i, rec.ID);
     CheckEqualsString(IntToStr(i), rec.Name);
   end;
@@ -144,8 +163,60 @@ begin
 
   Status(Format('%D items found in %D ms', [FTrie.Count, sw.ElapsedMilliseconds]));
 
-  CheckFalse(FTrie.Find('random valuesdsd', rec));
+  CheckFalse(FTrie.TryGetValue('random valuesdsd', rec));
 end;
+
+procedure TestTSvStringTrie.TestIterateOver;
+var
+  ix: Integer;
+  dict: TDictionary<Integer, Boolean>;
+begin
+  TestAdd;
+  ix := 0;
+
+
+  dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
+  try
+    FTrie.IterateOver(
+      procedure(const AKey: string; const AData: TestRec; var Abort: Boolean)
+      begin
+        CheckFalse(dict.ContainsKey(AData.ID), Format('Duplicated key on iteration %D',[ix]));
+        dict.Add(AData.ID, True);
+
+        Inc(ix);
+      end);
+
+    CheckEquals(FTrie.Count, ix);
+
+    ix := 0;
+    FTrie.IterateOver(
+      procedure(const AKey: string; const AData: TestRec; var Abort: Boolean)
+      begin
+        Inc(ix);
+        Abort := ( ix = 100);
+      end);
+
+    CheckEquals(100, ix);
+
+  finally
+    dict.Free;
+  end;
+end;
+
+procedure TestTSvStringTrie.TestStatistics;
+var
+  maxlev,pCount,fCount,eCount: Integer;
+  lStat: TLengthStatistics;
+begin
+  TestAdd;
+
+  FTrie.TrieStatistics(maxlev, pCount, fCount, eCount, lStat);
+
+  CheckTrue(maxlev > 0);
+end;
+
+{$HINTS ON}
+{$WARNINGS ON}
 
 initialization
   RegisterTest(TestTSvStringTrie.Suite);

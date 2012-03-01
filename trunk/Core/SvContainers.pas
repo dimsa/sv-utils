@@ -30,7 +30,12 @@ unit SvContainers;
 interface
 
 uses
-  Classes, Generics.Collections;
+  Classes, Generics.Collections, SysUtils;
+
+const
+  // BucketSize determines max length of the list. Very big|small values decrease performance, while
+  // the optimum value in range 4..16.
+  BucketSize = 8;
 
 type
 
@@ -45,8 +50,9 @@ type
   end;
 
  // THashTrie = class; //forward declaration
-
- // TTraverseProc = procedure<T>(UserData, UserProc: Pointer; Value: Cardinal; Data: T; var Done: Boolean) of object;
+  TSvStringTrieIterateRef<T> = reference to procedure(const AKey: string; const AData: T;
+    var Abort: Boolean);
+  TSvFreeItemEvent<T> = procedure(Sender: TObject; const S: string; const Data: T) of object;
 
   THashTreeItem<T> = class(TObject)
   private
@@ -62,7 +68,7 @@ type
     function Modify(Value, Hash: Cardinal; const Data: T): Boolean;
     function ROR(Value: Cardinal): Cardinal;
     function RORN(Value: Cardinal; Level: Integer): Cardinal;
-   // function Traverse(UserData, UserProc: Pointer; TraverseProc: TTraverseProc): Boolean;
+    function Traverse(AProc: TSvStringTrieIterateRef<T>): Boolean; overload;
   public
     constructor Create(AOwner: TObject);
     destructor Destroy; override;
@@ -70,10 +76,13 @@ type
     procedure Clear;
   end;
 
+  TLengthStatistics = array[1..BucketSize] of Integer;
 
   THashTrie<T> = class(TEnumerable<T>)
   private
     FRoot: THashTreeItem<T>;
+    FOwnsObjects: Boolean;
+    FOnFreeItem: TSvFreeItemEvent<T>;
     function GetCount: Integer;
   protected
     function DoGetEnumerator: TEnumerator<T>; override;
@@ -82,20 +91,24 @@ type
     procedure Delete(Value, Hash: Cardinal);
     procedure DestroyItem(var Value: Cardinal; var Data: T); virtual; abstract;
     function HashValue(Value: Cardinal): Cardinal; virtual; abstract;
+    procedure TreeStat(Item: THashTreeItem<T>; var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
+      var LengthStatistics: TLengthStatistics);
 
-
-  //  procedure Traverse(UserData, UserProc: Pointer; TraverseProc: TTraverseProc);
+    property OwnsObjects: Boolean read FOwnsObjects write FOwnsObjects;
   public
-    constructor Create; virtual;
+    constructor Create(); virtual;
     destructor Destroy; override;
 
-
-
     procedure Clear;
-    function Find(Value, Hash: Cardinal; var Data: T): Boolean; overload;
+    function Find(Value, Hash: Cardinal; var Data: T): Boolean;
+
+    procedure TrieStatistics(var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
+      var LengthStatistics: TLengthStatistics);
 
     property Count: Integer read GetCount;
 
+
+    property OnFreeItem: TSvFreeItemEvent<T> read FOnFreeItem write FOnFreeItem;
   type
     TEnumerator = class(TEnumerator<T>)
     private
@@ -116,31 +129,50 @@ type
       function MoveNext: Boolean;
     end;
 
-    function GetEnumerator: TEnumerator; reintroduce;
+    //function GetEnumerator: TEnumerator; reintroduce;
   end;
 
+
+  ESvStringTrieException = class(Exception);
 
   TSvStringTrie<T> = class(THashTrie<T>)
   private
     FCaseSensitive: Boolean;
-  //  FOnFreeItem: TSHTFreeItemEvent;
+    function GetKeys(const AData: T): string;
+    procedure SetKeys(const AData: T; const Value: string);
+    function GetValues(const AKey: string): T;
+    procedure SetValues(const AKey: string; const Value: T);
   protected
     function HashValue(Value: Cardinal): Cardinal; override;
     procedure DestroyItem(var Value: Cardinal; var Data: T); override;
     function CompareValue(Value1, Value2: Cardinal): Boolean; override;
     function HashStr(const S: string): Cardinal;
-  //  procedure TraverseProc(UserData, UserProc: Pointer; Value: Cardinal; Data: T; var Done: Boolean);
-  //  procedure TraverseMeth(UserData, UserProc: Pointer; Value: Cardinal; Data: T; var Done: Boolean);
   public
     procedure Add(const S: string; const Data: T);
+    procedure AddOrSetValue(const S: string; const Data: T);
+
+    function Contains(const Value: T): Boolean;
+    function ContainsKey(const Key: string): Boolean;
+    function ContainsValue(const Value: T): Boolean;
+
+    function Remove(const AData: T): string;
     procedure Delete(const S: string);
-    function Find(const S: string; var Data: T): Boolean; overload;
-  //  procedure Traverse(UserData: Pointer; UserProc: TStrHashTraverseProc); overload;
-  //  procedure Traverse(UserData: Pointer; UserProc: TStrHashTraverseMeth); overload;
+    function TryGetValue(const S: string; out Data: T): Boolean;
+
+    function IterateOver(AProc: TSvStringTrieIterateRef<T>): Boolean;
 
     property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive default False;
+    property Keys[const AData: T]: string read GetKeys write SetKeys;
+    property Values[const AKey: string]: T read GetValues write SetValues;
+  end;
 
-  //  property OnFreeItem: TSHTFreeItemEvent read FOnFreeItem write FOnFreeItem;
+  TSvStringObjectTrie<T: class> = class(TSvStringTrie<T>)
+  protected
+    procedure DestroyItem(var Value: Cardinal; var Data: T); override;
+  public
+    constructor Create(AOwnsObject: Boolean = True); reintroduce;
+
+    property OwnsObjects;
   end;
 
   function CalcStrCRC32(const S: string): Cardinal;
@@ -152,7 +184,7 @@ type
 implementation
 
 uses
-  SysUtils;
+  Generics.Defaults;
 
 const
   BufferIncrement = 1024; // Size by which the buffer in the buffered string is incremented
@@ -160,9 +192,6 @@ const
 
   // LeafSize must be 256. No changes allowed.
   LeafSize = 256;
-  // BucketSize determines max length of the list. Very big|small values decrease performance, while
-  // the optimum value in range 4..16.
-  BucketSize = 8;
 
   const
   CRC32_POLYNOMIAL = $EDB88320;
@@ -591,8 +620,8 @@ begin
   end;
 end;
 
-{
-function THashTreeItem<T>.Traverse(UserData, UserProc: Pointer; TraverseProc: TTraverseProc): Boolean;
+
+function THashTreeItem<T>.Traverse(AProc: TSvStringTrieIterateRef<T>): Boolean;
 var
   I: Integer;
   LinkedItem: THashLinkedItem<T>;
@@ -602,20 +631,21 @@ begin
     if Assigned(FItems[I]) then
     begin
       if FItems[I] is THashTreeItem<T> then
-        Result := THashTreeItem<T>(FItems[I]).Traverse(UserData, UserProc, TraverseProc)
+        Result := THashTreeItem<T>(FItems[I]).Traverse(AProc)
       else
       begin
         LinkedItem := THashLinkedItem<T>(FItems[I]);
         while Assigned(LinkedItem) do
         begin
-          TraverseProc(UserData, UserProc, LinkedItem.FValue, LinkedItem.FData, Result);
+          AProc(PChar(LinkedItem.FValue), LinkedItem.FData, Result);
+
           LinkedItem := LinkedItem.FNext;
         end;
       end;
       if Result then
         Break;
     end;
-end;   }
+end;
 
 { THashTrie<T> }
 
@@ -629,9 +659,11 @@ begin
   FRoot.Clear;
 end;
 
-constructor THashTrie<T>.Create;
+constructor THashTrie<T>.Create();
 begin
   inherited Create;
+  FOnFreeItem := nil;
+  FOwnsObjects := False;
   FRoot := THashTreeItem<T>.Create(Self);
 end;
 
@@ -661,17 +693,56 @@ begin
   Result := FRoot.GetFilled;
 end;
 
+procedure THashTrie<T>.TreeStat(Item: THashTreeItem<T>; var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
+      var LengthStatistics: TLengthStatistics);
+var
+  I, J: Integer;
+  LinkedItem: THashLinkedItem<T>;
+begin
+  Inc(PeakCount);
+  if Item.FLevel + 1 > MaxLevel then
+    MaxLevel := Item.FLevel + 1;
 
+  for J := 0 to High(Item.FItems) do
+    if Assigned(Item.FItems[J]) then
+    begin
+      Inc(FillCount);
+      if Item.FItems[J] is THashTreeItem<T> then
+        TreeStat(THashTreeItem<T>(Item.FItems[J]), MaxLevel, PeakCount, FillCount, EmptyCount, LengthStatistics)
+      else
+      begin
+        I := 0;
+        LinkedItem := THashLinkedItem<T>(Item.FItems[J]);
+        while Assigned(LinkedItem) do
+        begin
+          Inc(I);
+          LinkedItem := LinkedItem.FNext;
+        end;
+        Inc(LengthStatistics[I]);
+      end;
+    end
+    else
+      Inc(EmptyCount);
+end;
+
+procedure THashTrie<T>.TrieStatistics(var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
+  var LengthStatistics: TLengthStatistics);
+begin
+  MaxLevel := 0;
+  PeakCount := 0;
+  FillCount := 0;
+  EmptyCount := 0;
+
+  if Assigned(FRoot) then
+    TreeStat(FRoot, MaxLevel, PeakCount, FillCount, EmptyCount, LengthStatistics);
+end;
+
+{
 function THashTrie<T>.GetEnumerator: TEnumerator;
 begin
   Result := TEnumerator.Create(Self);
 end;
-
-{
-procedure THashTrie<T>.Traverse(UserData, UserProc: Pointer; TraverseProc: TTraverseProc);
-begin
-  FRoot.Traverse(UserData, UserProc, TraverseProc);
-end;   }
+}
 
 { TStringHashTrie<T> }
 
@@ -683,12 +754,42 @@ begin
   AddDown(Cardinal(Value), HashStr(S), Data);
 end;
 
+procedure TSvStringTrie<T>.AddOrSetValue(const S: string; const Data: T);
+begin
+  if ContainsKey(S) then
+  begin
+    Delete(S);
+  end;
+
+  Add(S, Data);
+end;
+
 function TSvStringTrie<T>.CompareValue(Value1, Value2: Cardinal): Boolean;
 begin
   if FCaseSensitive then
     Result := StrComp(PChar(Value1), PChar(Value2)) = 0
   else
     Result := StrIComp(PChar(Value1), PChar(Value2)) = 0;
+end;
+
+function TSvStringTrie<T>.Contains(const Value: T): Boolean;
+var
+  sRes: string;
+begin
+  sRes := Keys[Value];
+  Result := (sRes <> '');
+end;
+
+function TSvStringTrie<T>.ContainsKey(const Key: string): Boolean;
+var
+  Data: T;
+begin
+  Result := TryGetValue(Key, Data);
+end;
+
+function TSvStringTrie<T>.ContainsValue(const Value: T): Boolean;
+begin
+  Result := Contains(Value);
 end;
 
 procedure TSvStringTrie<T>.Delete(const S: string);
@@ -698,12 +799,41 @@ end;
 
 procedure TSvStringTrie<T>.DestroyItem(var Value: Cardinal; var Data: T);
 begin
+  if Assigned(FOnFreeItem) then
+    FOnFreeItem(Self, PChar(Value), Data);
+
   StrDispose(PChar(Value));
   Value := 0;
-  {TODO -oLinas -cGeneral : add event on free item}
+  {DONE -oLinas -cGeneral : add event on free item}
+
 end;
 
-function TSvStringTrie<T>.Find(const S: string; var Data: T): Boolean;
+function TSvStringTrie<T>.GetKeys(const AData: T): string;
+var
+  sRes: string;
+begin
+  sRes := '';
+  IterateOver(procedure(const AKey: string; const ADataVal: T; var Abort: Boolean)
+    begin
+      Abort := TEqualityComparer<T>.Default.Equals(AData, ADataVal);
+      if Abort then
+      begin
+        sRes := AKey;
+      end;
+    end);
+
+  Result := sRes;
+end;
+
+function TSvStringTrie<T>.GetValues(const AKey: string): T;
+begin
+  if not TryGetValue(AKey, Result) then
+  begin
+    raise ESvStringTrieException.Create('Value of a key ' + AKey + ' does not exist');
+  end;
+end;
+
+function TSvStringTrie<T>.TryGetValue(const S: string; out Data: T): Boolean;
 begin
   Result := Find(Cardinal(PChar(S)), HashStr(S), Data);
 end;
@@ -720,28 +850,31 @@ function TSvStringTrie<T>.HashValue(Value: Cardinal): Cardinal;
 begin
   Result := HashStr(PChar(Value));
 end;
-{
-procedure TStringHashTrie<T>.Traverse(UserData: Pointer; UserProc: TStrHashTraverseProc);
+
+function TSvStringTrie<T>.IterateOver(AProc: TSvStringTrieIterateRef<T>): Boolean;
 begin
-  inherited Traverse(UserData, @UserProc, TraverseProc);
+  Result := FRoot.Traverse(AProc);
 end;
 
-procedure TStringHashTrie<T>.Traverse(UserData: Pointer; UserProc: TStrHashTraverseMeth);
+function TSvStringTrie<T>.Remove(const AData: T): string;
 begin
-  inherited Traverse(UserData, @TMethod(UserProc), TraverseMeth);
+  Result := Keys[AData];
+
+  if Result <> '' then
+  begin
+    Delete(Result);
+  end;
 end;
 
-procedure TStringHashTrie<T>.TraverseMeth(UserData, UserProc: Pointer; Value: Cardinal; Data: T; var Done: Boolean);
-type
-  PTStrHashTraverseMeth = ^TStrHashTraverseMeth;
+procedure TSvStringTrie<T>.SetKeys(const AData: T; const Value: string);
 begin
-  PTStrHashTraverseMeth(UserProc)^(UserData, PChar(Value), Data, Done);
+  AddOrSetValue(Value, AData);
 end;
 
-procedure TStringHashTrie<T>.TraverseProc(UserData, UserProc: Pointer; Value: Cardinal; Data: T; var Done: Boolean);
+procedure TSvStringTrie<T>.SetValues(const AKey: string; const Value: T);
 begin
-  TStrHashTraverseProc(UserProc)(UserData, PChar(Value), Data, Done);
-end; }
+  AddOrSetValue(AKey, Value);
+end;
 
 { THashTrie<T>.TEnumerator }
 
@@ -751,7 +884,8 @@ begin
   FTrie := ATrie;
   FIndex := 0;
   FRoot := FTrie.FRoot;
-  FCurrObj := FRoot.FItems[FIndex];
+  FCurrObj := FRoot;
+ // FCurrObj := FRoot.FItems[FIndex];
   FLinkedItem := nil;
   FMax := FTrie.Count;
   FCurrIndex := -1;
@@ -776,57 +910,133 @@ end;
 
 function THashTrie<T>.TEnumerator.MoveNext: Boolean;
 var
-  ix: Integer;
+  ix, FOldIndex: Integer;
   FOldObj: TObject;
   FOldRoot: THashTreeItem<T>;
+  bFound: Boolean;
  // FOldLinkedItem: THashLinkedItem<T>;
 begin
   Result := (FCurrIndex < FMax - 1 ) ;
   if not Result then
     Exit;
 
-  if Assigned(FLinkedItem) then
-  begin
-    FLinkedItem := FLinkedItem.FNext;
-    Result := Assigned(FLinkedItem);
-    if Result then
-      Exit
-    else
-    begin
-      FCurrObj := FRoot.FItems[FIndex];
-    end;
-  end;
+  bFound := False;
 
-  if Assigned(FCurrObj) then
+  while not bFound do
   begin
-    if FCurrObj is THashTreeItem<T> then
+
+    if Assigned(FLinkedItem) then
     begin
-      FRoot := THashTreeItem<T>(FCurrObj);
-      FCurrObj := FRoot.FItems[FIndex];
-      FLinkedItem := nil;
-      ix := FIndex;
-      FOldObj := FCurrObj;
-      FOldRoot := FRoot;
-    //  FOldLinkedItem := FLinkedItem;
-      FIndex := 0;
-      Inc(FIndex);
-      //do recursion
-      Result := MoveNext;
-      //restore index
-      FIndex := ix;
-     // Inc(FIndex);
-      FRoot := FOldRoot;
-  //    FCurrObj := FOldObj;
-    //  FLinkedItem := FOldLinkedItem;
+      FLinkedItem := FLinkedItem.FNext;
+      Result := Assigned(FLinkedItem);
+      if Result then
+        Exit
+      else
+      begin
+        FCurrObj := nil;
+        while not Assigned(FCurrObj) and (FIndex <= High(FRoot.FItems)) do
+        begin
+
+          FCurrObj := FRoot.FItems[FIndex];
+          Inc(FIndex);
+        end;
+      end;
+    end;
+
+    if Assigned(FCurrObj) then
+    begin
+      if FCurrObj is THashTreeItem<T> then
+      begin
+        ix := -1;
+        //set new root
+        FRoot := THashTreeItem<T>(FCurrObj);
+        //init index to 0, because we will start recursion
+      //  FIndex := 0;
+        //get new item
+        FCurrObj := nil;
+        while not Assigned(FCurrObj) and (ix <= High(FRoot.FItems)) do
+        begin
+          Inc(ix);
+          FCurrObj := FRoot.FItems[ix];
+        end;
+
+
+        //save old state
+        FOldRoot := FRoot;
+        FOldObj := FCurrObj;
+       // FOldIndex := FIndex;
+        FLinkedItem := nil;
+        //do recursion
+        Result := MoveNext;
+
+        // FIndex := ix;
+        Inc(ix);
+
+        FRoot := FOldRoot;
+        FCurrObj := FOldObj;
+        FIndex := ix;
+        //restore old state
+        if Result then
+        begin
+
+          Exit;
+        end;
+
+        bFound := not ( ix <= High(FRoot.FItems) ) ;
+      //  FLinkedItem := nil;
+      //  FLinkedItem := FOldLinkedItem;
+      end
+      else
+      begin
+        FLinkedItem := THashLinkedItem<T>(FCurrObj);
+       // Inc(FIndex);
+        Result := Assigned(FLinkedItem.FNext);
+        bFound := Result;
+      //  if not Result then
+     //   begin
+     //     Result := ( FIndex < High(FRoot.FItems) ) ;
+
+         { FCurrObj := FRoot.FItems[FIndex];
+          FOldObj := FCurrObj;
+          FOldRoot := FRoot;
+          Result := MoveNext;
+
+          FRoot := FOldRoot;
+          FCurrObj := FOldObj; }
+      //  end;
+       // FCurrObj := FLinkedItem.FNext;
+      end;
     end
     else
     begin
-      FLinkedItem := THashLinkedItem<T>(FCurrObj);
-      Inc(FIndex);
-      Result := Assigned(FLinkedItem.FNext);
-
-     // FCurrObj := FLinkedItem.FNext;
+      FIndex := -1;
+      while not Assigned(FCurrObj) and (FIndex <= High(FRoot.FItems)) do
+      begin
+        Inc(FIndex);
+        FCurrObj := FRoot.FItems[FIndex];
+      end;
+      //FCurrObj := FRoot.FOwner;
+      bFound := not Assigned(FCurrObj);
     end;
+
+  end;
+
+end;
+
+{ TSvStringObjectTrie<T> }
+
+constructor TSvStringObjectTrie<T>.Create(AOwnsObject: Boolean);
+begin
+  inherited Create;
+  FOwnsObjects := AOwnsObject;
+end;
+
+procedure TSvStringObjectTrie<T>.DestroyItem(var Value: Cardinal; var Data: T);
+begin
+  inherited DestroyItem(Value, Data);
+  if FOwnsObjects then
+  begin
+    Data.Free;
   end;
 end;
 
