@@ -63,7 +63,9 @@ type
   protected
     procedure AddDown(Value, Hash: Cardinal; const Data: T);
     procedure Delete(Value, Hash: Cardinal);
-    function Find(Value, Hash: Cardinal; var Data: T): Boolean;
+    function Find(Value, Hash: Cardinal; out Data: T): Boolean; overload;
+    function Find(Value, Hash: Cardinal; out Data: THashLinkedItem<T>): Boolean; overload;
+    function FindStartMatch(Value, Hash: Cardinal; out Data: TList<T>): Boolean;
     function GetFilled: Integer;
     function Modify(Value, Hash: Cardinal; const Data: T): Boolean;
     function ROR(Value: Cardinal): Cardinal;
@@ -93,23 +95,19 @@ type
     function HashValue(Value: Cardinal): Cardinal; virtual; abstract;
     procedure TreeStat(Item: THashTreeItem<T>; var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
       var LengthStatistics: TLengthStatistics);
-
+    function Find(Value, Hash: Cardinal; out Data: T): Boolean; virtual;
     property OwnsObjects: Boolean read FOwnsObjects write FOwnsObjects;
   public
     constructor Create(); virtual;
     destructor Destroy; override;
 
     procedure Clear;
-    function Find(Value, Hash: Cardinal; var Data: T): Boolean;
 
     procedure TrieStatistics(var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
       var LengthStatistics: TLengthStatistics);
 
     property Count: Integer read GetCount;
-
-
     property OnFreeItem: TSvFreeItemEvent<T> read FOnFreeItem write FOnFreeItem;
-
   end;
 
 
@@ -155,9 +153,12 @@ type
     function ContainsKey(const Key: string): Boolean;
     function ContainsValue(const Value: T): Boolean;
 
+    function Extract(const AKey: string): T;
+
     function Remove(const AData: T): string;
     procedure Delete(const S: string);
     function TryGetValue(const S: string; out Data: T): Boolean;
+    function TryGetValues(const S: string; out Data: TList<T>): Boolean;
 
     function IterateOver(AProc: TSvStringTrieIterateRef<T>): Boolean;
 
@@ -316,57 +317,6 @@ begin
   Result := C;
 end;
 
-{
-procedure TrieStatistics<T>(Trie: THashTrie<T>; var MaxLevel, PeakCount, FillCount, EmptyCount: Integer;
-  var LengthStatistics: TLengthStatistics);
-
-  //--------------- local function --------------------------------------------
-
-  procedure TreeStat(Item: THashTreeItem);
-
-  var
-    I, J: Integer;
-    LinkedItem: THashLinkedItem;
-
-  begin
-    Inc(PeakCount);
-    if Item.FLevel + 1 > MaxLevel then
-      MaxLevel := Item.FLevel + 1;
-
-    for J := 0 to High(Item.FItems) do
-      if Assigned(Item.FItems[J]) then
-      begin
-        Inc(FillCount);
-        if Item.FItems[J] is THashTreeItem then
-          TreeStat(THashTreeItem(Item.FItems[J]))
-        else
-        begin
-          I := 0;
-          LinkedItem := THashLinkedItem(Item.FItems[J]);
-          while Assigned(LinkedItem) do
-          begin
-            Inc(I);
-            LinkedItem := LinkedItem.FNext;
-          end;
-          Inc(LengthStatistics[I]);
-        end;
-      end
-      else
-        Inc(EmptyCount);
-  end;
-
-  //--------------- end local function ----------------------------------------
-
-begin
-  MaxLevel := 0;
-  PeakCount := 0;
-  FillCount := 0;
-  EmptyCount := 0;
-
-  if Assigned(Trie.FRoot) then
-    TreeStat(Trie.FRoot);
-end;  }
-
 { THashLinkedItem }
 
 constructor THashLinkedItem<T>.Create(Value: Cardinal; Data: T; Next: THashLinkedItem<T>);
@@ -521,7 +471,7 @@ begin
   inherited Destroy;
 end;
 
-function THashTreeItem<T>.Find(Value, Hash: Cardinal; var Data: T): Boolean;
+function THashTreeItem<T>.Find(Value, Hash: Cardinal; out Data: THashLinkedItem<T>): Boolean;
 var
   I: Integer;
   LinkedItem: THashLinkedItem<T>;
@@ -542,13 +492,42 @@ begin
         if THashTrie<T>(FOwner).CompareValue(LinkedItem.FValue, Value) then
         begin
           // found
-          Data := LinkedItem.FData;
+          Data := LinkedItem;
           Result := True;
           Exit;
         end;
         LinkedItem := LinkedItem.FNext;
       end;
     end;
+  end;
+end;
+
+function THashTreeItem<T>.FindStartMatch(Value, Hash: Cardinal; out Data: TList<T>): Boolean;
+var
+  LinkedItem: THashLinkedItem<T>;
+begin
+  Result := Find(Value, Hash, LinkedItem);
+  if Result then
+  begin
+    Data := TList<T>.Create;
+
+    while Assigned(LinkedItem) do
+    begin
+      Data.Add(LinkedItem.FData);
+
+      LinkedItem := LinkedItem.FNext;
+    end;
+  end;
+end;
+
+function THashTreeItem<T>.Find(Value, Hash: Cardinal; out Data: T): Boolean;
+var
+  LinkedItem: THashLinkedItem<T>;
+begin
+  Result := Find(Value, Hash, LinkedItem);
+  if Result then
+  begin
+    Data := LinkedItem.FData;
   end;
 end;
 
@@ -574,35 +553,13 @@ end;
 
 function THashTreeItem<T>.Modify(Value, Hash: Cardinal; const Data: T): Boolean;
 var
-  I: Integer;
   LinkedItem: THashLinkedItem<T>;
-
 begin
-  Result := False;
-  I := Hash and $FF;
-  if High(FItems) < I then
-    SetLength(FItems, I + 1);
-  if Assigned(FItems[I]) then
+  Result := Find(Value, Hash, LinkedItem);
+  if Result then
   begin
-    if FItems[I] is THashTreeItem<T> then
-      Result := THashTreeItem<T>(FItems[I]).Modify(Value, ROR(Hash), Data)
-    else
-    begin
-      LinkedItem := THashLinkedItem<T>(FItems[I]);
-      while Assigned(LinkedItem) do
-      begin
-        if THashTrie<T>(FOwner).CompareValue(LinkedItem.FValue, Value) then
-        begin
-          // found
-          LinkedItem.FData := Data;
-          Result := True;
-          Exit;
-        end;
-        LinkedItem := LinkedItem.FNext;
-      end;
-    end;
+    LinkedItem.FData := Data;
   end;
-
 end;
 
 function THashTreeItem<T>.ROR(Value: Cardinal): Cardinal;
@@ -685,7 +642,7 @@ begin
   Result := GetEnumerator;
 end;
 
-function THashTrie<T>.Find(Value, Hash: Cardinal; var Data: T): Boolean;
+function THashTrie<T>.Find(Value, Hash: Cardinal; out Data: T): Boolean;
 begin
   Result := FRoot.Find(Value, Hash, Data);
 end;
@@ -804,6 +761,14 @@ begin
 
 end;
 
+function TSvStringTrie<T>.Extract(const AKey: string): T;
+begin
+  if TryGetValue(AKey, Result) then
+  begin
+    Delete(AKey);
+  end;
+end;
+
 function TSvStringTrie<T>.GetEnumerator: TPairEnumerator;
 begin
   Result := TPairEnumerator.Create(Self);
@@ -839,12 +804,17 @@ begin
   Result := Find(Cardinal(PChar(S)), HashStr(S), Data);
 end;
 
+function TSvStringTrie<T>.TryGetValues(const S: string; out Data: TList<T>): Boolean;
+begin
+  Result := FRoot.FindStartMatch(Cardinal(PChar(S)), HashStr(S), Data);
+end;
+
 function TSvStringTrie<T>.HashStr(const S: string): Cardinal;
 begin
   if FCaseSensitive then
     Result := CalcStrCRC32(S)
   else
-    Result := CalcStrCRC32(ANSIUpperCase(S));
+    Result := CalcStrCRC32(AnsiUpperCase(S));
 end;
 
 function TSvStringTrie<T>.HashValue(Value: Cardinal): Cardinal;

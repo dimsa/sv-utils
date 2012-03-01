@@ -28,7 +28,7 @@
 			<DCC_Define>_CONSOLE_TESTRUNNER;$(DCC_Define)</DCC_Define>
 			<DCC_UsePackage>vcl;vclx;VclSmp;rtl;vclimg;svnui;svn;bdertl;TeeUI;TeeDB;Tee;vclactnband;vcldb;dbrtl;vcldbx;vcltouch;xmlrtl;dsnap;dsnapcon;vclib;ibxpress;adortl;IndyCore;IndySystem;IndyProtocols;inet;intrawebdb_110_150;Intraweb_110_150;vclie;websnap;webdsnap;inetdb;inetdbbde;inetdbxpress;soaprtl;vclribbon;dbexpress;DbxCommonDriver;DataSnapIndy10ServerTransport;DataSnapProviderClient;DbxClientDriver;DataSnapClient;dbxcds;DataSnapServer;AzureCloud;DBXInterBaseDriver;DBXMySQLDriver;DBXFirebirdDriver;DBXSybaseASEDriver;DBXSybaseASADriver;DBXOracleDriver;DBXMSSQLDriver;DBXInformixDriver;DBXDb2Driver;CodeSiteExpressVcl</DCC_UsePackage>
 			<DCC_ImageBase>00400000</DCC_ImageBase>
-			<DCC_DcuOutput>.</DCC_DcuOutput>
+			<DCC_DcuOutput>.\$(Config)\$(Platform)\DCU</DCC_DcuOutput>
 			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
 			<DCC_ExeOutput>.\$(Config)\$(Platform)</DCC_ExeOutput>
 		</PropertyGroup>
@@ -59,6 +59,8 @@
 			<DCCReference Include="..\Core\SvRttiUtils.pas"/>
 			<DCCReference Include="..\Core\SvContainers.pas"/>
 			<DCCReference Include="TestSvContainers.pas"/>
+			<DCCReference Include="..\Core\SvCollections.Tries.pas"/>
+			<DCCReference Include="..\Core\SvCollections.BinaryAccess.pas"/>
 			<RcItem Include="..\SQLite3\Bin\Sunset.jpg">
 				<ResourceType>RCDATA</ResourceType>
 				<ResourceId>JpgImage_1</ResourceId>
