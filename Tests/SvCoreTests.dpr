@@ -31,7 +31,9 @@ uses
   TestSvClasses in 'TestSvClasses.pas',
   SvRttiUtils in '..\Core\SvRttiUtils.pas',
   SvContainers in '..\Core\SvContainers.pas',
-  TestSvContainers in 'TestSvContainers.pas';
+  TestSvContainers in 'TestSvContainers.pas',
+  SvCollections.Tries in '..\Core\SvCollections.Tries.pas',
+  SvCollections.BinaryAccess in '..\Core\SvCollections.BinaryAccess.pas';
 
 {$R *.RES}
 

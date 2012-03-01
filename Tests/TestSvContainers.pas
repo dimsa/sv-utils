@@ -30,7 +30,7 @@ unit TestSvContainers;
 interface
 
 uses
-  TestFramework, SysUtils, Classes, SvContainers, Diagnostics;
+  TestFramework, SysUtils, Classes, SvContainers, Diagnostics, SvCollections.Tries;
 
 type
   TestRec = record
@@ -52,6 +52,18 @@ type
     procedure TestEnumerator();
     procedure TestIterateOver();
     procedure TestStatistics();
+    procedure TestTryGetValues();
+  end;
+
+  TestTSvTrieDictionary = class(TTestCase)
+  private
+    FTrie: TSvTrie<string,Integer>;
+    sw: TStopwatch;
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestAdd();
   end;
 
 implementation
@@ -200,6 +212,8 @@ begin
   end;
 end;
 
+
+
 procedure TestTSvStringTrie.TestStatistics;
 var
   maxlev,pCount,fCount,eCount: Integer;
@@ -212,10 +226,85 @@ begin
   CheckTrue(maxlev > 0);
 end;
 
+const
+  ARRTEXT: array[0..9] of string =
+    ('First',
+     'First Text',
+     'Was first place',
+     'first try',
+     'first and second versions were awesome',
+     'some demo quote',
+     'he was old',
+     'he is old',
+     'he',
+     'she is young');
+
+procedure TestTSvStringTrie.TestTryGetValues;
+var
+  i: Integer;
+  rec: TestRec;
+  results: TList<TestRec>;
+begin
+  //add some text
+  for i := Low(ARRTEXT) to high(ARRTEXT) do
+  begin
+    rec.ID := i;
+    rec.Name := ARRTEXT[i];
+    FTrie.Add(ARRTEXT[i], rec);
+  end;
+
+  CheckEquals(Length(ARRTEXT), FTrie.Count);
+
+  if FTrie.TryGetValues('First', results) then
+  begin
+    try
+      CheckEquals(4, results.Count);
+    finally
+      results.Free;
+    end;
+  end;
+end;
+
 {$HINTS ON}
 {$WARNINGS ON}
 
+{ TestTSvTrieDictionary }
+
+procedure TestTSvTrieDictionary.SetUp;
+begin
+  inherited;
+  FTrie := TSvTrie<string,Integer>.Create();
+end;
+
+procedure TestTSvTrieDictionary.TearDown;
+begin
+  FTrie.Free;
+  inherited;
+end;
+
+procedure TestTSvTrieDictionary.TestAdd;
+var
+//  rec: TestRec;
+  i: Integer;
+begin
+  FTrie.Clear;
+  sw := TStopwatch.StartNew;
+  for i := 1 to ITER_SIZE do
+  begin
+    //rec.ID := i;
+   // rec.Name := IntToStr(i);
+
+    FTrie.Add(IntToStr(i), i);
+  end;
+  sw.Stop;
+
+  CheckEquals(ITER_SIZE, FTrie.Count);
+
+  Status(Format('%D items added in %D ms', [FTrie.Count, sw.ElapsedMilliseconds]));
+end;
+
 initialization
   RegisterTest(TestTSvStringTrie.Suite);
+  RegisterTest(TestTSvTrieDictionary.Suite);
 
 end.
