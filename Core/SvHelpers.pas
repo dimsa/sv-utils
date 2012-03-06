@@ -52,6 +52,7 @@ type
     /// <param name="AStream">Stream containing image</param>
     procedure LoadFromStreamSmart(AStream: TStream);
     procedure LoadFromFileSmart(const AFilename: string);
+    procedure SaveToStream(AStream: TStream);
   end;
 
 
@@ -189,6 +190,12 @@ begin
     Stream.Free;
     Graphic.Free;
   end;
+end;
+
+procedure TPictureHelper.SaveToStream(AStream: TStream);
+begin
+  if Graphic <> nil then
+    Graphic.SaveToStream(AStream);
 end;
 
 { TFieldHelper }
