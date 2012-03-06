@@ -105,7 +105,7 @@ begin
     if not db.TableExists(TABLENAME) then
     begin
       Factory.Errors.Add(ERR_INCOMPATIBLE_FILE);
-      raise ESQLiteSerializerException.Create(ERR_INCOMPATIBLE_FILE);
+      raise ESQLiteSerializerException.Create(ERR_INCOMPATIBLE_FILE + '. File: ' + AFromFilename);
     end;
 
     Qry := db.GetUniTableIntf(SQL_SELECT_DATA, [FUniqueKey]);

@@ -65,7 +65,11 @@ type
   private
     FFactoryMethods: TDictionary<TKey, TFactoryMethod<TBaseType>>;
     FDefaultKey: TKey;
+    FIsThreadSafe: Boolean;
+    FCSection: TCriticalSection;
     function GetCount: Integer;
+    function GetIsThreadSafe: Boolean;
+    procedure SetIsThreadSafe(const Value: Boolean);
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -88,11 +92,12 @@ type
     function IsRegistered(const AKey: TKey): Boolean; virtual;
 
     class function CreateElement(): TBaseType;
-    
+
     function GetEnumerator: TFactoryEnumerator;
   protected
-    function GetInstance(const AKey: TKey): TBaseType; virtual; abstract;
+    function DoGetInstance(const AKey: TKey): TBaseType; virtual; abstract;
   public
+    function GetInstance(const AKey: TKey): TBaseType;
     /// <summary>
     /// Retrieves default factory.
     /// </summary>
@@ -100,6 +105,10 @@ type
     /// Default key must be registered for this method to work properly
     /// </remarks>
     function GetDefaultInstance(): TBaseType; virtual;
+    /// <summary>
+    /// Is GetInstance function Thread Safe?
+    /// </summary>
+    property IsThreadSafe: Boolean read GetIsThreadSafe write SetIsThreadSafe;
     /// <summary>
     /// Count of registered factory methods
     /// </summary>
@@ -110,18 +119,19 @@ type
   /// Factory method class
   /// </summary>
   TFactory<TKey, TBaseType> = class(TAbstractFactory<TKey, TBaseType>)
-  public
-    constructor Create; override;
-    destructor Destroy; override;
+  protected
     /// <summary>
     /// Gets instance of TBaseType
     /// </summary>
     /// <remarks>
-    /// AFactoryMethod will be invoked on each and every instance retrieval. 
+    /// AFactoryMethod will be invoked on each and every instance retrieval.
     /// </remarks>
     /// <param name="AKey">Key of an element</param>
     /// <returns>Instance of TBaseType</returns>
-    function GetInstance(const AKey: TKey): TBaseType; override;
+    function DoGetInstance(const AKey: TKey): TBaseType; override;
+  public
+    constructor Create; override;
+    destructor Destroy; override;
   end;
 
   /// <summary>
@@ -133,6 +143,17 @@ type
     FOwnsObjects: Boolean;
     procedure ClearObject(const AValue: TValue);
     procedure ClearObjects();
+  protected
+    /// <summary>
+    /// Gets instance of TBaseType
+    /// </summary>
+    /// <remarks>
+    /// AFactoryMethod will be invoked only on first instance retrieval. Further retrievals
+    ///  will return the same instance as it was returned in AFactoryMethod
+    /// </remarks>
+    /// <param name="AKey">Key of an element</param>
+    /// <returns>Instance of TBaseType</returns>
+    function DoGetInstance(const AKey: TKey): TBaseType; override;
   public
     constructor Create(AOwnsObjects: Boolean = False); reintroduce; overload; 
     destructor Destroy; override;
@@ -145,16 +166,8 @@ type
     procedure RegisterFactoryMethod(const AKey: TKey; AFactoryMethod: TFactoryMethod<TBaseType>); override;
     procedure UnregisterFactoryMethod(const AKey: TKey); override;
     procedure UnregisterAll(); override;
-    /// <summary>
-    /// Gets instance of TBaseType
-    /// </summary>
-    /// <remarks>
-    /// AFactoryMethod will be invoked only on first instance retrieval. Further retrievals 
-    ///  will return the same instance as it was returned in AFactoryMethod
-    /// </remarks>
-    /// <param name="AKey">Key of an element</param>
-    /// <returns>Instance of TBaseType</returns>
-    function GetInstance(const AKey: TKey): TBaseType; override;
+
+
     /// <summary>
     /// If multiton owns object , it will try to free them.
     /// </summary>
@@ -246,6 +259,7 @@ begin
   inherited Create();
   FFactoryMethods := TDictionary<TKey, TFactoryMethod<TBaseType>>.Create();
   FDefaultKey := System.Default(TKey);
+  FCSection := TCriticalSection.Create;
 end;
 
 class function TAbstractFactory<TKey, TBaseType>.CreateElement: TBaseType;
@@ -256,6 +270,7 @@ end;
 destructor TAbstractFactory<TKey, TBaseType>.Destroy;
 begin
   FFactoryMethods.Free;
+  FCSection.Free;
   inherited Destroy;
 end;
 
@@ -272,6 +287,23 @@ end;
 function TAbstractFactory<TKey, TBaseType>.GetEnumerator: TFactoryEnumerator;
 begin
   Result := TFactoryEnumerator.Create(Self);
+end;
+
+function TAbstractFactory<TKey, TBaseType>.GetInstance(const AKey: TKey): TBaseType;
+begin
+  if FIsThreadSafe then
+    FCSection.Enter;
+  try
+    Result := DoGetInstance(AKey);
+  finally
+    if FIsThreadSafe then
+      FCSection.Leave;
+  end;
+end;
+
+function TAbstractFactory<TKey, TBaseType>.GetIsThreadSafe: Boolean;
+begin
+  Result := FIsThreadSafe;
 end;
 
 function TAbstractFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;
@@ -294,6 +326,12 @@ begin
     raise TFactoryMethodKeyAlreadyRegisteredException.Create('Factory already registered');
 
   FFactoryMethods.Add(AKey, AFactoryMethod);
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.SetIsThreadSafe(const Value: Boolean);
+begin
+  if FIsThreadSafe <> Value then
+    FIsThreadSafe := Value;
 end;
 
 procedure TAbstractFactory<TKey, TBaseType>.UnregisterAll;
@@ -358,7 +396,7 @@ begin
   inherited Destroy;
 end;
 
-function TFactory<TKey, TBaseType>.GetInstance(const AKey: TKey): TBaseType;
+function TFactory<TKey, TBaseType>.DoGetInstance(const AKey: TKey): TBaseType;
 var
   factoryMethod: TFactoryMethod<TBaseType>;
 begin
@@ -412,7 +450,7 @@ begin
   inherited;
 end;
 
-function TMultiton<TKey, TBaseType>.GetInstance(const AKey: TKey): TBaseType;
+function TMultiton<TKey, TBaseType>.DoGetInstance(const AKey: TKey): TBaseType;
 var
   factoryMethod: TFactoryMethod<TBaseType>;
   AValue: TValue;
