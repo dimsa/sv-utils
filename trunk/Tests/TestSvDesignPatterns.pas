@@ -55,6 +55,11 @@ type
     procedure TestGetDefaultInstance;
   end;
 
+  TestTMultitonThreadSafe = class(TestTMultiton)
+  public
+    procedure SetUp; override;
+  end;
+
   TestTSingleton = class(TTestCase)
   private
     FSingleton: TSingleton<TStringList>;
@@ -412,10 +417,19 @@ begin
   CheckEquals(3, iCounter);
 end;
 
+{ TestTMultitonThreadSafe }
+
+procedure TestTMultitonThreadSafe.SetUp;
+begin
+  inherited;
+  FMultiton.IsThreadSafe := True;
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestTFactory.Suite);
   RegisterTest(TestTMultiton.Suite);
+  RegisterTest(TestTMultitonThreadSafe.Suite);
   RegisterTest(TestTSingleton.Suite);
   RegisterTest(TestSvLazy.Suite);
 end.
