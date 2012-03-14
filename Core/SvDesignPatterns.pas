@@ -212,6 +212,9 @@ type
 
   ISvLazy<T> = interface
     ['{433C34BB-E5F3-4594-814C-70F02C415CB8}']
+    function OwnsObjects: Boolean;
+    function ValueCreated: Boolean;
+    procedure SetValue(const AValue: T);
     function GetValue: T;
     property Value: T read GetValue;
   end;
@@ -223,9 +226,14 @@ type
     FOwnsObjects: Boolean;
     FValue: T;
     function GetValue: T;
+  protected
+    procedure SetValue(const AValue: T);
+    function OwnsObjects: Boolean;
   public
     constructor Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
     destructor Destroy; override;
+
+    function ValueCreated: Boolean;
 
     property Value: T read GetValue;
   end;
@@ -244,8 +252,12 @@ type
     /// <param name="AOwnsObjects">Boolean property to specify if lazy value should free it's value when it goes out of scope</param>
     constructor Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
 
+    procedure Assign(const AValue: T);
+    function IsValueCreated: Boolean;
+
     class operator Implicit(const ALazy: SvLazy<T>): T; inline;
     class operator Implicit(const AValueFactory: TFunc<T>): SvLazy<T>; inline;
+    class operator Implicit(const AValue: T): SvLazy<T>; inline;
 
     property Value: T read GetValue;
   end;
@@ -600,7 +612,43 @@ begin
   Result := FValue;
 end;
 
+function TSvLazy<T>.OwnsObjects: Boolean;
+begin
+  Result := FOwnsObjects;
+end;
+
+procedure TSvLazy<T>.SetValue(const AValue: T);
+begin
+  FValueCreated := True;
+  FValue := AValue;
+end;
+
+function TSvLazy<T>.ValueCreated: Boolean;
+begin
+  Result := FValueCreated;
+end;
+
 { SvLazy<T> }
+
+procedure SvLazy<T>.Assign(const AValue: T);
+var
+  oldValue: T;
+begin
+  if Assigned(FLazy) then
+  begin
+    if FLazy.OwnsObjects and FLazy.ValueCreated then
+    begin
+      oldValue := FLazy.Value;
+      TSvRtti.DestroyClass<T>(oldValue);
+    end;
+
+    FLazy.SetValue(AValue);
+  end
+  else
+  begin
+    FLazy := TSvLazy<T>.Create(function: T begin Result := AValue end);
+  end;
+end;
 
 constructor SvLazy<T>.Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean);
 begin
@@ -610,6 +658,18 @@ end;
 function SvLazy<T>.GetValue: T;
 begin
   Result := FLazy.Value;
+end;
+
+class operator SvLazy<T>.Implicit(const AValue: T): SvLazy<T>;
+begin
+  Result := SvLazy<T>.Create(function: T begin Result := AValue; end);
+end;
+
+function SvLazy<T>.IsValueCreated: Boolean;
+begin
+  Result := False;
+  if Assigned(FLazy) then
+    Result := FLazy.ValueCreated;
 end;
 
 class operator SvLazy<T>.Implicit(const ALazy: SvLazy<T>): T;
