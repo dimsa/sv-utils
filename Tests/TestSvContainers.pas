@@ -38,6 +38,12 @@ type
     ID: Integer;
   end;
 
+  TestObj = class
+  public
+    Name: string;
+    ID: Integer;
+  end;
+
   TestTSvStringTrie = class(TTestCase)
   private
     FTrie: TSvStringTrie<TestRec>;
@@ -57,7 +63,7 @@ type
 
   TestTSvTrieDictionary = class(TTestCase)
   private
-    FTrie: TSvTrie<string,Integer>;
+    FTrie: TSvTrie<string,TestObj>;
     sw: TStopwatch;
   public
     procedure SetUp; override;
@@ -273,7 +279,7 @@ end;
 procedure TestTSvTrieDictionary.SetUp;
 begin
   inherited;
-  FTrie := TSvTrie<string,Integer>.Create();
+  FTrie := TSvTrie<string,TestObj>.Create();
 end;
 
 procedure TestTSvTrieDictionary.TearDown;
@@ -286,6 +292,7 @@ procedure TestTSvTrieDictionary.TestAdd;
 var
 //  rec: TestRec;
   i: Integer;
+  obj: TestObj;
 begin
   FTrie.Clear;
   sw := TStopwatch.StartNew;
@@ -293,8 +300,10 @@ begin
   begin
     //rec.ID := i;
    // rec.Name := IntToStr(i);
-
-    FTrie.Add(IntToStr(i), i);
+    obj := TestObj.Create;
+    obj.Name := 'Name ' + IntToStr(i);
+    obj.ID := i;
+    FTrie.Add(obj.Name, obj);
   end;
   sw.Stop;
 

@@ -30,13 +30,17 @@ unit SvRttiUtils;
 interface
 
 uses
-  Rtti;
+  Rtti, SysUtils;
 
 type
+  ESvRttiException = class(Exception);
+
   TSvRtti = class abstract
   public
     class function CreateNewClass<T>: T;
     class procedure DestroyClass<T>(var AObject: T);
+
+    class procedure SetValue<T>(const APropertyName: string; const AObject: T; const AValue: TValue);
   end;
 
 implementation
@@ -81,6 +85,41 @@ begin
         AMethDestroy.Invoke(TValue.From<T>(AObject), []);
         Break;
       end;
+    end;
+  end;
+end;
+
+class procedure TSvRtti.SetValue<T>(const APropertyName: string; const AObject: T; const AValue: TValue);
+var
+  rType: TRttiType;
+  rField: TRttiField;
+  rProp: TRttiProperty;
+  obj: TValue;
+begin
+  rType := TRttiContext.Create.GetType(TypeInfo(T));
+  rField := rType.GetField(APropertyName);
+  obj := TValue.From<T>(AObject);
+  if Assigned(rField) then
+  begin
+    if obj.IsObject then
+      rField.SetValue(obj.AsObject, AValue)
+    else
+      rField.SetValue(obj.GetReferenceToRawData, AValue);
+  end
+  else
+  begin
+    rProp := rType.GetProperty(APropertyName);
+    if Assigned(rProp) then
+    begin
+      if obj.IsObject then
+        rProp.SetValue(obj.AsObject, AValue)
+      else
+        rProp.SetValue(obj.GetReferenceToRawData, AValue);
+    end
+    else
+    begin
+      raise ESvRttiException.Create(Format('Property or field %S does not exist for a value %S',
+        [APropertyName, obj.ToString]));
     end;
   end;
 end;

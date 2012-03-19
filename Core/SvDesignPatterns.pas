@@ -64,6 +64,7 @@ type
       end;
   private
     FFactoryMethods: TDictionary<TKey, TFactoryMethod<TBaseType>>;
+    FInjectedValues: TObjectDictionary<TKey, TDictionary<string,TValue>>;
     FDefaultKey: TKey;
     FIsThreadSafe: Boolean;
     FCSection: TCriticalSection;
@@ -73,6 +74,7 @@ type
   public
     constructor Create; virtual;
     destructor Destroy; override;
+    procedure InjectFieldValue(const AKey: TKey; const AFieldName: string; const AValue: TValue); virtual;
     /// <summary>
     /// Registers default key which will be used when getting factory through GetDefaultInstance()
     /// </summary>
@@ -96,6 +98,7 @@ type
     function GetEnumerator: TFactoryEnumerator;
   protected
     function DoGetInstance(const AKey: TKey): TBaseType; virtual; abstract;
+    procedure DoInjectValues(const AKey: TKey; const ABaseType: TBaseType); virtual;
   public
     function GetInstance(const AKey: TKey): TBaseType;
     /// <summary>
@@ -270,6 +273,7 @@ constructor TAbstractFactory<TKey, TBaseType>.Create;
 begin
   inherited Create();
   FFactoryMethods := TDictionary<TKey, TFactoryMethod<TBaseType>>.Create();
+  FInjectedValues := TObjectDictionary<TKey, TDictionary<string,TValue>>.Create([doOwnsValues]);
   FDefaultKey := System.Default(TKey);
   FCSection := TCriticalSection.Create;
 end;
@@ -282,8 +286,23 @@ end;
 destructor TAbstractFactory<TKey, TBaseType>.Destroy;
 begin
   FFactoryMethods.Free;
+  FInjectedValues.Free;
   FCSection.Free;
   inherited Destroy;
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.DoInjectValues(const AKey: TKey; const ABaseType: TBaseType);
+var
+  list: TDictionary<string,TValue>;
+  pair: TPair<string, TValue>;
+begin
+  if FInjectedValues.TryGetValue(AKey, list) then
+  begin
+    for pair in list do
+    begin
+      TSvRtti.SetValue<TBaseType>(pair.Key, ABaseType, pair.Value);
+    end;
+  end;
 end;
 
 function TAbstractFactory<TKey, TBaseType>.GetCount: Integer;
@@ -307,6 +326,8 @@ begin
     FCSection.Enter;
   try
     Result := DoGetInstance(AKey);
+
+    DoInjectValues(AKey, Result);
   finally
     if FIsThreadSafe then
       FCSection.Leave;
@@ -316,6 +337,19 @@ end;
 function TAbstractFactory<TKey, TBaseType>.GetIsThreadSafe: Boolean;
 begin
   Result := FIsThreadSafe;
+end;
+
+procedure TAbstractFactory<TKey, TBaseType>.InjectFieldValue(const AKey: TKey; const AFieldName: string; const AValue: TValue);
+var
+  list: TDictionary<string,TValue>;
+begin
+  if not FInjectedValues.TryGetValue(AKey, list) then
+  begin
+    list := TDictionary<string,TValue>.Create;
+    FInjectedValues.Add(AKey, list);
+  end;
+
+  list.Add(AFieldName, AValue);
 end;
 
 function TAbstractFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;

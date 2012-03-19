@@ -15,14 +15,22 @@ uses
   TestFramework, Generics.Collections, SysUtils, SvDesignPatterns, Rtti, Classes;
 
 type
+  TSvStringList = class(TStringList)
+  private
+    FName: string;
+    FValue: TSvStringList;
+  public
+    constructor Create;
+  end;
+
   // Test methods for class TFactory
   {$HINTS OFF}
   //we dont need hints in our tests
   TestTFactory = class(TTestCase)
   private
-    FFunc: TFactoryMethod<TStringList>;
-    FFactory: TFactory<string, TStringList>;
-    slList: TStringList;
+    FFunc: TFactoryMethod<TSvStringList>;
+    FFactory: TFactory<string, TSvStringList>;
+    slList: TSvStringList;
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -34,14 +42,15 @@ type
     procedure TestIsRegistered;
     procedure TestCreateElement;
     procedure TestGetEnumerator;
+    procedure TestInject;
   end;
   // Test methods for class TMultiton
 
   TestTMultiton = class(TTestCase)
   private
-    FMultiton: TMultiton<string, TStringList>;
-    FFunc: TFactoryMethod<TStringList>;
-    slList: TStringList;
+    FMultiton: TMultiton<string, TSvStringList>;
+    FFunc: TFactoryMethod<TSvStringList>;
+    slList: TSvStringList;
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -62,8 +71,8 @@ type
 
   TestTSingleton = class(TTestCase)
   private
-    FSingleton: TSingleton<TStringList>;
-    FIntfSingleton: ISingleton<TStringList>;
+    FSingleton: TSingleton<TSvStringList>;
+    FIntfSingleton: ISingleton<TSvStringList>;
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -82,17 +91,17 @@ procedure TestTFactory.SetUp;
 var
   i: Integer;
 begin
-  FFactory := TFactory<string, TStringList>.Create;
-  FFunc := function: TStringList begin Result := TStringList.Create end;
-  slList := TStringList.Create;
+  FFactory := TFactory<string, TSvStringList>.Create;
+  FFunc := function: TSvStringList begin Result := TSvStringList.Create end;
+  slList := TSvStringList.Create;
 
   for i := 1 to 10 do
   begin
     slList.Add(IntToStr(i));
     FFactory.RegisterFactoryMethod(IntToStr(i),
-      function: TStringList
+      function: TSvStringList
       begin
-        Result := TStringList.Create;
+        Result := TSvStringList.Create;
         Result.Add('5');
       end);
   end;
@@ -102,7 +111,7 @@ end;
 
 procedure TestTFactory.TearDown;
 var
-  pair: TPair<string,TStringList>;
+  pair: TPair<string,TSvStringList>;
 begin
   for pair in FFactory do
   begin
@@ -115,7 +124,7 @@ end;
 
 procedure TestTFactory.TestCreateElement;
 var
-  sl: TStringList;
+  sl: TSvStringList;
 begin
   sl := nil;
   sl := FFactory.CreateElement;
@@ -128,7 +137,7 @@ end;
 
 procedure TestTFactory.TestGetEnumerator;
 var
-  pair: TPair<string,TStringList>;
+  pair: TPair<string,TSvStringList>;
 begin
   for pair in FFactory do
   begin
@@ -143,7 +152,7 @@ end;
 
 procedure TestTFactory.TestGetInstance;
 var
-  ReturnValue: TStringList;
+  ReturnValue: TSvStringList;
   AKey: string;
 begin
   ReturnValue := nil;
@@ -152,6 +161,34 @@ begin
   Check(Assigned(ReturnValue));
   CheckEquals(AKey ,ReturnValue[0]);
   ReturnValue.Free;
+end;
+
+procedure TestTFactory.TestInject;
+var
+  i: Integer;
+  obj, instance: TSvStringList;
+begin
+  obj := TSvStringList.Create;
+  try
+    obj.Add('Demo');
+    FFactory.InjectFieldValue('5', 'FName', 'Demo');
+    FFactory.InjectFieldValue('5', 'FValue', obj);
+
+    instance := FFactory.GetInstance('5');
+    CheckEqualsString('Demo', instance.FName);
+    CheckEqualsString('Demo', instance.FValue[0]);
+
+    instance.Free;
+
+    instance := FFactory.GetInstance('6');
+
+    CheckFalse(Assigned(instance.FValue));
+
+    instance.Free;
+
+  finally
+    obj.Free;
+  end;
 end;
 
 procedure TestTFactory.TestIsRegistered;
@@ -173,7 +210,7 @@ end;
 
 procedure TestTFactory.TestUnregisterAll;
 var
-  pair: TPair<string,TStringList>;
+  pair: TPair<string,TSvStringList>;
 begin
   CheckEquals(10, FFactory.Count);
   //free object to avoid memory leaks
@@ -200,17 +237,17 @@ procedure TestTMultiton.SetUp;
 var
   i: Integer;
 begin
-  FMultiton := TMultiton<string, TStringList>.Create(True);
-  FFunc := function: TStringList begin Result := TStringList.Create end;
-  slList := TStringList.Create;
+  FMultiton := TMultiton<string, TSvStringList>.Create(True);
+  FFunc := function: TSvStringList begin Result := TSvStringList.Create end;
+  slList := TSvStringList.Create;
 
   for i := 1 to 10 do
   begin
     slList.Add(IntToStr(i));
     FMultiton.RegisterFactoryMethod(IntToStr(i),
-      function: TStringList
+      function: TSvStringList
       begin
-        Result := TStringList.Create;
+        Result := TSvStringList.Create;
         Result.Add('5');
       end);
   end;
@@ -259,9 +296,9 @@ begin
   CheckEquals(10, FMultiton.Count);
   AKey := '11';
   FMultiton.RegisterFactoryMethod(AKey,
-    function: TStringList
+    function: TSvStringList
     begin
-      Result := TStringList.Create;
+      Result := TSvStringList.Create;
       Result.Add('111');
     end);
   CheckEquals(11, FMultiton.Count);
@@ -271,7 +308,7 @@ end;
 
 procedure TestTMultiton.TestGetEnumerator;
 var
-  pair: TPair<string,TStringList>;
+  pair: TPair<string,TSvStringList>;
 begin
   for pair in FMultiton do
   begin
@@ -285,7 +322,7 @@ end;
 
 procedure TestTMultiton.TestGetInstance;
 var
-  ReturnValue: TStringList;
+  ReturnValue: TSvStringList;
   AKey: string;
 begin
   AKey := '5';
@@ -309,18 +346,18 @@ end;
 
 procedure TestTSingleton.SetUp;
 var
-  method: TFactoryMethod<TStringList>;
+  method: TFactoryMethod<TSvStringList>;
 begin
   inherited;
 
-  method := function: TStringList
+  method := function: TSvStringList
     begin
-      Result := TStringList.Create;
+      Result := TSvStringList.Create;
       Result.AddStrings(TArray<string>.Create('1','2','3'));
     end;
 
-  FSingleton := TSingleton<TStringList>.Create;
-  FIntfSingleton := TSingleton<TStringList>.Create(method);
+  FSingleton := TSingleton<TSvStringList>.Create;
+  FIntfSingleton := TSingleton<TSvStringList>.Create(method);
 
   FSingleton.RegisterConstructor(method);
 end;
@@ -333,8 +370,8 @@ end;
 
 procedure TestTSingleton.TestGetInstance;
 var
-  sl1, sl2: TStringList;
-  singleton: ISingleton<TStringList>;
+  sl1, sl2: TSvStringList;
+  singleton: ISingleton<TSvStringList>;
 begin
   sl1 := nil;
   sl1 := FSingleton.GetInstance;
@@ -351,7 +388,7 @@ begin
   CheckEqualsString('2', sl2[1]);
   CheckEqualsString('3', sl2[2]);
   //default constructor
-  singleton := TSingleTon<TStringList>.Create();
+  singleton := TSingleTon<TSvStringList>.Create();
   sl1 := nil;
   sl1 := singleton.GetInstance;
   CheckTrue(Assigned(sl1));
@@ -362,7 +399,7 @@ begin
   CheckEqualsString('3', sl1[2]);
 end;
 
-{$HINTS ON}
+
 
 { TestSvLazy }
 
@@ -371,26 +408,27 @@ var
   lazy1: SvLazy<TStrings>;
   lazy2: SvLazy<TStrings>;
   lazy3: SvLazy<TStrings>;
+  lazy4: SvLazy<TStrings>;
   iCounter: Integer;
 begin
   iCounter := 0;
-  lazy1 :=
+  lazy1.Create(
     function: TStrings
     begin
-      Result := TStringList.Create;
+      Result := TSvStringList.Create;
       Sleep(100);
       Result.Add('Test1');
       Inc(iCounter);
-    end;
+    end);
 
-  lazy2 :=
+  lazy2.Create(
     function: TStrings
     begin
-      Result := TStringList.Create;
+      Result := TSvStringList.Create;
       Sleep(100);
       Result.Add('Test2');
       Inc(iCounter);
-    end;
+    end);
 
   CheckEquals(0, iCounter);
   CheckTrue(Assigned(lazy1.Value));
@@ -406,7 +444,7 @@ begin
   lazy3.Create(
     function: TStrings
     begin
-      Result := TStringList.Create;
+      Result := TSvStringList.Create;
       Sleep(100);
       Result.Add('Test3');
       Inc(iCounter);
@@ -415,14 +453,25 @@ begin
   CheckTrue(Assigned(lazy3.Value));
   CheckEqualsString('Test3', lazy3.Value[0]);
   CheckEquals(3, iCounter);
+  CheckTrue(lazy3.IsValueCreated);
+  CheckFalse(lazy4.IsValueCreated);
 end;
-
+{$HINTS ON}
 { TestTMultitonThreadSafe }
 
 procedure TestTMultitonThreadSafe.SetUp;
 begin
   inherited;
   FMultiton.IsThreadSafe := True;
+end;
+
+{ TSvStringList }
+
+constructor TSvStringList.Create;
+begin
+  inherited Create;
+  FValue := nil;
+  FName := '';
 end;
 
 initialization

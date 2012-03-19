@@ -180,6 +180,7 @@ type
     procedure SetValue(const Index: TStateIndex; const Value: TValue);
     procedure FinalizeState(Index: TStateIndex);
     function GetState(const Key: TKey): TStateIndex;
+    procedure DoLastClear;
   public
     constructor Create;
     destructor Destroy; override;
@@ -522,7 +523,7 @@ end;
 
 destructor TSvTrie<TKey,TValue>.Destroy;
 begin
-  Clear;
+  DoLastClear;
   FKeyCollection.Free;
   FValueCollection.Free;
   inherited;
@@ -532,6 +533,17 @@ function TSvTrie<TKey, TValue>.DoGetEnumerator: TPairEnumerator;
 begin
   Result := TPairEnumerator.Create(FItems);
   InitializeEnumerator(Result);
+end;
+
+procedure TSvTrie<TKey, TValue>.DoLastClear;
+var
+  I: Integer;
+begin
+  for I := 0 to High(FItems) do
+  begin
+    FinalizeState(I);
+  end;
+  FItems := nil;
 end;
 
 function TSvTrie<TKey, TValue>.GetEnumerator: IEnumerator<TPair<TKey,TValue>>;
