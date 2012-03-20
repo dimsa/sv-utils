@@ -33,6 +33,7 @@
 			<DCC_ExeOutput>.\$(Config)\$(Platform)</DCC_ExeOutput>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Cfg_1)'!=''">
+			<DCC_DebugDCUs>true</DCC_DebugDCUs>
 			<DCC_MapFile>3</DCC_MapFile>
 			<DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
 			<DCC_Optimize>false</DCC_Optimize>
@@ -48,6 +49,7 @@
 			<DelphiCompile Include="SvCoreTests.dpr">
 				<MainSource>MainSource</MainSource>
 			</DelphiCompile>
+			<DCCReference Include="FastMM4.pas"/>
 			<DCCReference Include="TestSvThreading.pas"/>
 			<DCCReference Include="..\Core\SvThreading.pas"/>
 			<DCCReference Include="TestSvDesignPatterns.pas"/>
@@ -60,7 +62,6 @@
 			<DCCReference Include="..\Core\SvContainers.pas"/>
 			<DCCReference Include="TestSvContainers.pas"/>
 			<DCCReference Include="..\Core\SvCollections.Tries.pas"/>
-			<DCCReference Include="..\Core\SvCollections.BinaryAccess.pas"/>
 			<RcItem Include="..\SQLite3\Bin\Sunset.jpg">
 				<ResourceType>RCDATA</ResourceType>
 				<ResourceId>JpgImage_1</ResourceId>
@@ -78,7 +79,7 @@
 			</BuildConfiguration>
 		</ItemGroup>
 		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
-		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\8.0\UserTools.proj"/>
+		<Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
 		<ProjectExtensions>
 			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
 			<Borland.ProjectType/>

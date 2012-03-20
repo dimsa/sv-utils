@@ -19,8 +19,13 @@ type
   private
     FName: string;
     FValue: TSvStringList;
+    [Inject] //will create stringlist
+    FObj: TStringList;
+    [Inject('100')]  //will assign 100 to FID
+    FID: Integer;
   public
     constructor Create;
+    destructor Destroy; override;
   end;
 
   // Test methods for class TFactory
@@ -62,6 +67,7 @@ type
     procedure TestGetEnumerator;
     procedure TestGetInstance;
     procedure TestGetDefaultInstance;
+    procedure TestInject;
   end;
 
   TestTMultitonThreadSafe = class(TestTMultiton)
@@ -113,10 +119,10 @@ procedure TestTFactory.TearDown;
 var
   pair: TPair<string,TSvStringList>;
 begin
-  for pair in FFactory do
+{  for pair in FFactory do
   begin
     pair.Value.Free;
-  end;
+  end;  }
   FFactory.Free;
   FFactory := nil;
   slList.Free;
@@ -132,6 +138,7 @@ begin
   CheckEquals(0, sl.Count);
   sl.Add('Temp');
   CheckEquals(1, sl.Count);
+  sl.FObj.Free;
   sl.Free;
 end;
 
@@ -146,6 +153,7 @@ begin
     CheckEquals(1, pair.Value.Count);
     pair.Value.Add('temp');
     CheckEquals(2, pair.Value.Count);
+    pair.Value.FObj.Free;
     pair.Value.Free;
   end;
 end;
@@ -160,6 +168,7 @@ begin
   ReturnValue := FFactory.GetInstance(AKey);
   Check(Assigned(ReturnValue));
   CheckEquals(AKey ,ReturnValue[0]);
+  ReturnValue.FObj.Free;
   ReturnValue.Free;
 end;
 
@@ -171,18 +180,24 @@ begin
   obj := TSvStringList.Create;
   try
     obj.Add('Demo');
-    FFactory.InjectFieldValue('5', 'FName', 'Demo');
-    FFactory.InjectFieldValue('5', 'FValue', obj);
+    //inject dynamically from code
+    FFactory.InjectValue('5', 'FName', 'Demo');
+    FFactory.InjectValue('5', 'FValue', obj);
 
     instance := FFactory.GetInstance('5');
     CheckEqualsString('Demo', instance.FName);
     CheckEqualsString('Demo', instance.FValue[0]);
+    CheckEquals(100, instance.FID);
 
+    CheckTrue(Assigned(instance.FObj));
+    instance.FObj.Free;
     instance.Free;
 
     instance := FFactory.GetInstance('6');
 
     CheckFalse(Assigned(instance.FValue));
+    CheckTrue(Assigned(instance.FObj));
+    instance.FObj.Free;
 
     instance.Free;
 
@@ -216,6 +231,7 @@ begin
   //free object to avoid memory leaks
   for pair in FFactory do
   begin
+    pair.Value.FObj.Free;
     pair.Value.Free;
   end;
   FFactory.UnregisterAll;
@@ -225,10 +241,13 @@ end;
 procedure TestTFactory.TestUnregisterFactoryMethod;
 var
   AKey: string;
+  instance: TSvStringList;
 begin
   CheckEquals(10, FFactory.Count);
   AKey := '5';
-  FFactory.GetInstance(AKey).Free;
+  instance := FFactory.GetInstance(AKey);
+  instance.FObj.Free;
+  instance.Free;
   FFactory.UnregisterFactoryMethod(AKey);
   CheckEquals(9, FFactory.Count);
 end;
@@ -330,6 +349,33 @@ begin
   ReturnValue := FMultiton.GetInstance(AKey);
   CheckTrue(Assigned(ReturnValue));
   CheckEquals(AKey, ReturnValue[0]);
+end;
+
+procedure TestTMultiton.TestInject;
+var
+  i: Integer;
+  obj, instance: TSvStringList;
+begin
+  obj := TSvStringList.Create;
+  try
+    obj.Add('Demo');
+    //inject dynamically from code
+    FMultiton.InjectValue('5', 'FName', 'Demo');
+    FMultiton.InjectValue('5', 'FValue', obj);
+
+    instance := FMultiton.GetInstance('5');
+    CheckEqualsString('Demo', instance.FName);
+    CheckEqualsString('Demo', instance.FValue[0]);
+    CheckEquals(100, instance.FID);
+
+    CheckTrue(Assigned(instance.FObj));
+    instance := FMultiton.GetInstance('6');
+
+    CheckFalse(Assigned(instance.FValue));
+    CheckTrue(Assigned(instance.FObj));
+  finally
+    obj.Free;
+  end;
 end;
 
 procedure TestTMultiton.TestIsRegistered;
@@ -472,6 +518,12 @@ begin
   inherited Create;
   FValue := nil;
   FName := '';
+  FObj := nil;
+end;
+
+destructor TSvStringList.Destroy;
+begin
+  inherited;
 end;
 
 initialization

@@ -30,7 +30,7 @@ unit SvDesignPatterns;
 interface
 
 uses
-  SysUtils, Generics.Collections, Rtti, SyncObjs, SvRttiUtils;
+  SysUtils, Generics.Collections, Rtti, SyncObjs;
 
 type
   EFactoryMethodKeyAlreadyRegisteredException = class(Exception);
@@ -40,6 +40,18 @@ type
   TFactoryMethodKeyNotRegisteredException = EFactoryMethodKeyNotRegisteredException;
 
   TFactoryMethod<TBaseType> = reference to function: TBaseType;
+
+  Inject = class(TCustomAttribute)
+  private
+    FValue: string;
+    FHasValue: Boolean;
+  public
+    constructor Create(); overload;
+    constructor Create(const AValue: string); overload;
+
+    property HasValue: Boolean read FHasValue;
+    property Value: string read FValue;
+  end;
 
   /// <summary>
   /// Abstract factory class
@@ -74,7 +86,7 @@ type
   public
     constructor Create; virtual;
     destructor Destroy; override;
-    procedure InjectFieldValue(const AKey: TKey; const AFieldName: string; const AValue: TValue); virtual;
+    procedure InjectValue(const AKey: TKey; const AFieldOrPropName: string; const AValue: TValue); virtual;
     /// <summary>
     /// Registers default key which will be used when getting factory through GetDefaultInstance()
     /// </summary>
@@ -99,6 +111,7 @@ type
   protected
     function DoGetInstance(const AKey: TKey): TBaseType; virtual; abstract;
     procedure DoInjectValues(const AKey: TKey; const ABaseType: TBaseType); virtual;
+    procedure ClearInjectedValues(const AObject: TObject); virtual;
   public
     function GetInstance(const AKey: TKey): TBaseType;
     /// <summary>
@@ -267,7 +280,59 @@ type
 
 implementation
 
+uses
+  SvRttiUtils,
+  Variants;
+
 { TAbstractFactory<TKey, TBaseType> }
+
+procedure TAbstractFactory<TKey, TBaseType>.ClearInjectedValues(const AObject: TObject);
+var
+  val: TValue;
+  rType: TRttiType;
+  rField: TRttiField;
+  rProp: TRttiProperty;
+  attr: TCustomAttribute;
+begin
+  rType := TRttiContext.Create.GetType(AObject.ClassInfo);
+  for rField in rType.GetFields do
+  begin
+    for attr in rField.GetAttributes do
+    begin
+      if attr is Inject then
+      begin
+        if not Inject(attr).HasValue then
+        begin
+          val := rField.GetValue(AObject);
+          if not val.IsEmpty and val.IsObject then
+          begin
+            val.AsObject.Free;
+          end;
+        end;
+        Break;
+      end;
+    end;
+  end;
+
+  for rProp in rType.GetProperties do
+  begin
+    for attr in rProp.GetAttributes do
+    begin
+      if attr is Inject then
+      begin
+        if not Inject(attr).HasValue then
+        begin
+          val := rProp.GetValue(AObject);
+          if not val.IsEmpty and val.IsObject then
+          begin
+            val.AsObject.Free;
+          end;
+        end;
+        Break;
+      end;
+    end;
+  end;
+end;
 
 constructor TAbstractFactory<TKey, TBaseType>.Create;
 begin
@@ -295,12 +360,81 @@ procedure TAbstractFactory<TKey, TBaseType>.DoInjectValues(const AKey: TKey; con
 var
   list: TDictionary<string,TValue>;
   pair: TPair<string, TValue>;
+  val, valBaseType: TValue;
+  obj: TBaseType;
+  newObj: TObject;
+  rType: TRttiType;
+  rField: TRttiField;
+  rProp: TRttiProperty;
+  attr: TCustomAttribute;
 begin
+  //enumerate attributes
+  valBaseType := TValue.From<TBaseType>(ABaseType);
+  if not valBaseType.IsEmpty and valBaseType.IsObject then
+  begin
+    rType := TRttiContext.Create.GetType(TypeInfo(TBaseType));
+
+    for rField in rType.GetFields do
+    begin
+      for attr in rField.GetAttributes do
+      begin
+        if attr is Inject then
+        begin
+          if not Inject(attr).HasValue then
+          begin
+            newObj := TSvRtti.CreateNewObject(rField.FieldType.Handle);
+            rField.SetValue(valBaseType.AsObject, newObj);
+          end
+          else
+          begin
+            //just assign value
+            TSvRtti.SetValueFromString(valBaseType.AsObject, Inject(attr).Value, rField);
+          end;
+
+          Break;
+        end;
+      end;
+    end;
+
+    for rProp in rType.GetProperties do
+    begin
+      for attr in rProp.GetAttributes do
+      begin
+        if attr is Inject then
+        begin
+          if not Inject(attr).HasValue then
+          begin
+            newObj := TSvRtti.CreateNewObject(rProp.PropertyType.Handle);
+            rProp.SetValue(valBaseType.AsObject, newObj);
+          end
+          else
+          begin
+            //just assign value
+            TSvRtti.SetValueFromString(valBaseType.AsObject, Inject(attr).Value, rProp);
+          end;
+
+          Break;
+        end;
+      end;
+    end;
+  end;
+
   if FInjectedValues.TryGetValue(AKey, list) then
   begin
     for pair in list do
     begin
-      TSvRtti.SetValue<TBaseType>(pair.Key, ABaseType, pair.Value);
+      val := pair.Value;
+      if (val.IsEmpty) then
+      begin
+        //if value is empty and property is instance then create this property object
+        if TSvRtti.IsInstanceProp<TBaseType>(pair.Key, ABaseType) then
+        begin
+          obj := TSvRtti.CreateNewClass<TBaseType>;
+          val := TValue.From<TBaseType>(obj);
+        end;
+      end;
+
+      TSvRtti.SetValue<TBaseType>(pair.Key, ABaseType, val);
     end;
   end;
 end;
@@ -339,7 +473,7 @@ begin
   Result := FIsThreadSafe;
 end;
 
-procedure TAbstractFactory<TKey, TBaseType>.InjectFieldValue(const AKey: TKey; const AFieldName: string; const AValue: TValue);
+procedure TAbstractFactory<TKey, TBaseType>.InjectValue(const AKey: TKey; const AFieldOrPropName: string; const AValue: TValue);
 var
   list: TDictionary<string,TValue>;
 begin
@@ -349,7 +483,7 @@ begin
     FInjectedValues.Add(AKey, list);
   end;
 
-  list.Add(AFieldName, AValue);
+  list.Add(AFieldOrPropName, AValue);
 end;
 
 function TAbstractFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;
@@ -465,7 +599,10 @@ begin
   begin
     obj := AValue.AsObject;
     if Assigned(obj) then
+    begin
+      ClearInjectedValues(obj);
       obj.Free;
+    end;
   end;
 end;
 
@@ -543,7 +680,7 @@ begin
   if FOwnsObjects then
   begin
     AValue := FLifetimeWatcher.Items[AKey];
-    ClearObject(AValue);                    
+    ClearObject(AValue);
   end;
   FLifetimeWatcher.Remove(AKey);
 end;
@@ -714,6 +851,22 @@ end;
 class operator SvLazy<T>.Implicit(const AValueFactory: TFunc<T>): SvLazy<T>;
 begin
   Result := SvLazy<T>.Create(AValueFactory);
+end;
+
+{ Inject }
+
+constructor Inject.Create;
+begin
+  inherited Create;
+  FValue := '';
+  FHasValue := False;
+end;
+
+constructor Inject.Create(const AValue: string);
+begin
+  Create;
+  FValue := AValue;
+  FHasValue := True;
 end;
 
 end.
