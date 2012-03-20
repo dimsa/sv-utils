@@ -392,8 +392,8 @@ begin
     begin
       if aNode.LastCharAdded then
       begin
-        aNode.FLastAdded := False;
         Notification(aNode, nDeleted);
+        aNode.FLastAdded := False;
       end;
 
       //check if aNode has leafs
