@@ -38,12 +38,19 @@ type
   TSvRtti = class abstract
   public
     class function CreateNewClass<T>: T;
+    class function CreateNewObject(ATypeInfo: Pointer): TObject;
     class procedure DestroyClass<T>(var AObject: T);
+    class function IsInstanceProp<T>(const APropertyName: string; const AObject: T): Boolean;
 
     class procedure SetValue<T>(const APropertyName: string; const AObject: T; const AValue: TValue);
+    class procedure SetValueFromString(const AObject: TObject; const AValue: string; AField: TRttiField); overload;
+    class procedure SetValueFromString(const AObject: TObject; const AValue: string; AProp: TRttiProperty); overload;
   end;
 
 implementation
+
+uses
+  TypInfo;
 
 { TSvRtti }
 
@@ -70,6 +77,30 @@ begin
   end;
 end;
 
+class function TSvRtti.CreateNewObject(ATypeInfo: Pointer): TObject;
+var
+  rType: TRttiType;
+  AMethCreate: TRttiMethod;
+  instanceType: TRttiInstanceType;
+begin
+  Result := nil;
+  rType := TRttiContext.Create.GetType(ATypeInfo);
+  if rType.IsInstance then
+  begin
+    for AMethCreate in rType.GetMethods do
+    begin
+      if (AMethCreate.IsConstructor) and (Length(AMethCreate.GetParameters) = 0) then
+      begin
+        instanceType := rType.AsInstance;
+
+        Result := AMethCreate.Invoke(instanceType.MetaclassType, []).AsObject;
+
+        Break;
+      end;
+    end;
+  end;
+end;
+
 class procedure TSvRtti.DestroyClass<T>(var AObject: T);
 var
   rType: TRttiType;
@@ -87,6 +118,27 @@ begin
       end;
     end;
   end;
+end;
+
+class function TSvRtti.IsInstanceProp<T>(const APropertyName: string; const AObject: T): Boolean;
+var
+  rType: TRttiType;
+  rField: TRttiField;
+  rProp: TRttiProperty;
+begin
+  Result := False;
+
+  rType := TRttiContext.Create.GetType(TypeInfo(T));
+  if not rType.IsInstance then
+    Exit;
+
+  rField := rType.GetField(APropertyName);
+  if Assigned(rField) then
+    Exit(rField.FieldType.IsInstance);
+
+  rProp := rType.GetProperty(APropertyName);
+  if Assigned(rProp) then
+    Exit(rProp.PropertyType.IsInstance);
 end;
 
 class procedure TSvRtti.SetValue<T>(const APropertyName: string; const AObject: T; const AValue: TValue);
@@ -122,6 +174,68 @@ begin
         [APropertyName, obj.ToString]));
     end;
   end;
+end;
+
+class procedure TSvRtti.SetValueFromString(const AObject: TObject; const AValue: string;
+  AProp: TRttiProperty);
+var
+  val: TValue;
+  i: Integer;
+begin
+  val := TValue.Empty;
+  case AProp.PropertyType.TypeKind of
+    tkUnknown: val := TValue.Empty;
+    tkInteger: val := StrToInt(AValue);
+    tkEnumeration:
+    begin
+      val := TValue.FromOrdinal(AProp.PropertyType.Handle,
+        GetEnumValue(AProp.PropertyType.Handle, AValue));
+    end;
+    tkFloat: val := StrToFloat(AValue); //
+    tkSet:
+    begin
+      i := StringToSet(AProp.PropertyType.Handle, AValue);
+      TValue.Make(@i, AProp.PropertyType.Handle, val);
+    end;
+    tkVariant: val := TValue.FromVariant(AValue);
+    tkInt64: val := StrToInt64(AValue);
+    tkUString, tkWChar, tkLString, tkWString, tkString, tkChar: val := AValue
+    else
+      Exit;
+  end;
+
+  AProp.SetValue(AObject, val);
+end;
+
+class procedure TSvRtti.SetValueFromString(const AObject: TObject; const AValue: string;
+  AField: TRttiField);
+var
+  val: TValue;
+  i: Integer;
+begin
+  val := TValue.Empty;
+  case AField.FieldType.TypeKind of
+    tkUnknown: val := TValue.Empty;
+    tkInteger: val := StrToInt(AValue);
+    tkEnumeration:
+    begin
+      val := TValue.FromOrdinal(AField.FieldType.Handle,
+        GetEnumValue(AField.FieldType.Handle, AValue));
+    end;
+    tkFloat: val := StrToFloat(AValue); //
+    tkSet:
+    begin
+      i := StringToSet(AField.FieldType.Handle, AValue);
+      TValue.Make(@i, AField.FieldType.Handle, val);
+    end;
+    tkVariant: val := TValue.FromVariant(AValue);
+    tkInt64: val := StrToInt64(AValue);
+    tkUString, tkWChar, tkLString, tkWString, tkString, tkChar: val := AValue
+    else
+      Exit;
+  end;
+
+  AField.SetValue(AObject, val);
 end;
 
 end.

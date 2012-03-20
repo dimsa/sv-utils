@@ -46,7 +46,7 @@ type
 
   TestTSvStringTrie = class(TTestCase)
   private
-    FTrie: TSvStringTrie<TestRec>;
+    FTrie: TSvObjectStringTrie<TestObj>;
     sw: TStopwatch;
   public
     procedure SetUp; override;
@@ -57,19 +57,7 @@ type
     procedure TestFind();
     procedure TestEnumerator();
     procedure TestIterateOver();
-    procedure TestStatistics();
     procedure TestTryGetValues();
-  end;
-
-  TestTSvTrieDictionary = class(TTestCase)
-  private
-    FTrie: TSvTrie<string,TestObj>;
-    sw: TStopwatch;
-  public
-    procedure SetUp; override;
-    procedure TearDown; override;
-  published
-    procedure TestAdd();
   end;
 
 implementation
@@ -85,7 +73,7 @@ uses
 procedure TestTSvStringTrie.SetUp;
 begin
   inherited;
-  FTrie := TSvStringTrie<TestRec>.Create;
+  FTrie := TSvObjectStringTrie<TestObj>.Create(True, True);
 end;
 
 procedure TestTSvStringTrie.TearDown;
@@ -99,13 +87,14 @@ const
 
 procedure TestTSvStringTrie.TestAdd;
 var
-  rec: TestRec;
+  rec: TestObj;
   i: Integer;
 begin
   FTrie.Clear;
   sw := TStopwatch.StartNew;
   for i := 1 to ITER_SIZE do
   begin
+    rec := TestObj.Create;
     rec.ID := i;
     rec.Name := IntToStr(i);
 
@@ -127,7 +116,7 @@ begin
   sw := TStopwatch.StartNew;
   for i := 1 to ITER_SIZE do
   begin
-    FTrie.Delete(IntToStr(i));
+    FTrie.Remove(IntToStr(i));
   end;
   sw.Stop;
 
@@ -141,7 +130,7 @@ var
   pair: TPair<string,TestRec>;
   dict: TDictionary<Integer, Boolean>;
 begin
-  TestAdd;
+ { TestAdd;
   ix := 0;
   dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
   try
@@ -156,20 +145,18 @@ begin
     CheckEquals(ix, ITER_SIZE);
   finally
     dict.Free;
-  end;
+  end;    }
 end;
 
 procedure TestTSvStringTrie.TestFind;
 var
-  rec: TestRec;
+  rec: TestObj;
   i: Integer;
 begin
   TestAdd;
   sw := TStopwatch.StartNew;
   for i := 1 to ITER_SIZE do
   begin
-    rec.ID := -1;
-    rec.Name := '';
     CheckTrue( FTrie.TryGetValue(IntToStr(i), rec));
     CheckEquals(i, rec.ID);
     CheckEqualsString(IntToStr(i), rec.Name);
@@ -192,26 +179,26 @@ begin
 
   dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
   try
-    FTrie.IterateOver(
-      procedure(const AKey: string; const AData: TestRec; var Abort: Boolean)
+    FTrie.Traverse(
+      procedure(const AKey: string; ANode: TSuffixTrieNode<TestObj>)
       begin
-        CheckFalse(dict.ContainsKey(AData.ID), Format('Duplicated key on iteration %D',[ix]));
-        dict.Add(AData.ID, True);
+        CheckFalse(dict.ContainsKey(ANode.Value.ID), Format('Duplicated key on iteration %D',[ix]));
+        dict.Add(ANode.Value.ID, True);
 
         Inc(ix);
       end);
 
     CheckEquals(FTrie.Count, ix);
 
-    ix := 0;
+ {   ix := 0;
     FTrie.IterateOver(
-      procedure(const AKey: string; const AData: TestRec; var Abort: Boolean)
+      procedure(const AKey: string; ANode: TSuffixTrieNode<TestObj>)
       begin
         Inc(ix);
         Abort := ( ix = 100);
       end);
 
-    CheckEquals(100, ix);
+    CheckEquals(100, ix);   }
 
   finally
     dict.Free;
@@ -219,18 +206,6 @@ begin
 end;
 
 
-
-procedure TestTSvStringTrie.TestStatistics;
-var
-  maxlev,pCount,fCount,eCount: Integer;
-  lStat: TLengthStatistics;
-begin
-  TestAdd;
-
-  FTrie.TrieStatistics(maxlev, pCount, fCount, eCount, lStat);
-
-  CheckTrue(maxlev > 0);
-end;
 
 const
   ARRTEXT: array[0..9] of string =
@@ -248,12 +223,13 @@ const
 procedure TestTSvStringTrie.TestTryGetValues;
 var
   i: Integer;
-  rec: TestRec;
-  results: TList<TestRec>;
+  rec: TestObj;
+  results: TList<TestObj>;
 begin
   //add some text
   for i := Low(ARRTEXT) to high(ARRTEXT) do
   begin
+    rec := TestObj.Create;
     rec.ID := i;
     rec.Name := ARRTEXT[i];
     FTrie.Add(ARRTEXT[i], rec);
@@ -261,59 +237,18 @@ begin
 
   CheckEquals(Length(ARRTEXT), FTrie.Count);
 
-  if FTrie.TryGetValues('First', results) then
-  begin
-    try
-      CheckEquals(4, results.Count);
-    finally
-      results.Free;
-    end;
+  results := FTrie.TryGetValues('First');
+  try
+    CheckEquals(4, results.Count);
+  finally
+    results.Free;
   end;
-end;
+ end;
 
 {$HINTS ON}
 {$WARNINGS ON}
 
-{ TestTSvTrieDictionary }
-
-procedure TestTSvTrieDictionary.SetUp;
-begin
-  inherited;
-  FTrie := TSvTrie<string,TestObj>.Create();
-end;
-
-procedure TestTSvTrieDictionary.TearDown;
-begin
-  FTrie.Free;
-  inherited;
-end;
-
-procedure TestTSvTrieDictionary.TestAdd;
-var
-//  rec: TestRec;
-  i: Integer;
-  obj: TestObj;
-begin
-  FTrie.Clear;
-  sw := TStopwatch.StartNew;
-  for i := 1 to ITER_SIZE do
-  begin
-    //rec.ID := i;
-   // rec.Name := IntToStr(i);
-    obj := TestObj.Create;
-    obj.Name := 'Name ' + IntToStr(i);
-    obj.ID := i;
-    FTrie.Add(obj.Name, obj);
-  end;
-  sw.Stop;
-
-  CheckEquals(ITER_SIZE, FTrie.Count);
-
-  Status(Format('%D items added in %D ms', [FTrie.Count, sw.ElapsedMilliseconds]));
-end;
-
 initialization
   RegisterTest(TestTSvStringTrie.Suite);
-  RegisterTest(TestTSvTrieDictionary.Suite);
 
 end.
