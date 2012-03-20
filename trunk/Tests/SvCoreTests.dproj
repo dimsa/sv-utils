@@ -49,7 +49,6 @@
 			<DelphiCompile Include="SvCoreTests.dpr">
 				<MainSource>MainSource</MainSource>
 			</DelphiCompile>
-			<DCCReference Include="FastMM4.pas"/>
 			<DCCReference Include="TestSvThreading.pas"/>
 			<DCCReference Include="..\Core\SvThreading.pas"/>
 			<DCCReference Include="TestSvDesignPatterns.pas"/>

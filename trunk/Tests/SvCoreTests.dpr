@@ -17,7 +17,7 @@ program SvCoreTests;
 {$R *.dres}
 
 uses
-  FastMM4 in 'FastMM4.pas',
+ // FastMM4 in 'FastMM4.pas',
   Forms,
   TestFramework,
   GUITestRunner,
