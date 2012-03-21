@@ -68,7 +68,8 @@ type
     procedure Add(const P: PChar; const AValue: T; ALastChar: Boolean = False);
     function Find(const P: PChar; out AValue: TSuffixTrieNode<T>): Boolean;
     function FindExact(const P: PChar; out AValue: TSuffixTrieNode<T>): Boolean;
-    function Exists(const P: PChar; out AValue: T; AExactMatch: Boolean = False): Boolean;
+    function Exists(const P: PChar; out AValue: T; AExactMatch: Boolean = False): Boolean; overload;
+    function Exists(const P: PChar; out AValue: TSuffixTrieNode<T>; AExactMatch: Boolean = False): Boolean; overload;
     function ToString(const ps: String): String; reintroduce; overload;
     function HasChildren(): Boolean; inline;
 
@@ -91,7 +92,28 @@ type
     FSearchFromStart: Boolean;
   protected
     procedure Notification(ANode: TSuffixTrieNode<T>; AAction: TNodeNotification); virtual; abstract;
-    function Exists(const S: String; out AValue: T; AExactMatch: Boolean = False): Boolean;
+    function Exists(const S: String; out AValue: T; AExactMatch: Boolean = False): Boolean; overload;
+    function Exists(const S: String; out AValue: TSuffixTrieNode<T>; AExactMatch: Boolean = False): Boolean; overload;
+  public
+    type
+      TPairEnumerator = class(TEnumerator<TPair<string, T>>)
+      private
+        FTrie: TSvStringTrie<T>;
+        FIndex: Integer;
+        FItems: TArray<TPair<string, T>>;
+        function GetCurrent: TPair<string, T>;
+      protected
+        function DoGetCurrent: TPair<string, T>; override;
+        function DoMoveNext: Boolean; override;
+      public
+        constructor Create(ATrie: TSvStringTrie<T>);
+        destructor Destroy; override;
+
+        property Current: TPair<string, T> read GetCurrent;
+        function MoveNext: Boolean;
+      end;
+
+    function GetEnumerator: TPairEnumerator;
   public
     constructor Create(ASearchFromStartOnly: Boolean = False); virtual;
     destructor Destroy; override;
@@ -100,6 +122,7 @@ type
 
     procedure Remove(const S: string);
     procedure Clear;
+    function ContainsKey(const AKey: string; const AExactMatch: Boolean = True): Boolean;
 
     procedure Traverse(AProc: TTraverseProc<T>);
 
@@ -185,15 +208,21 @@ function TSuffixTrieNode<T>.Exists(const P: PChar; out AValue: T;
 var
   node: TSuffixTrieNode<T>;
 begin
-  if AExactMatch then
-    Result := FindExact(P, node)
-  else
-    Result := Find(P, node);
+  Result := Exists(P, node, AExactMatch);
 
   if Result then
   begin
     AValue := node.Value;
   end;
+end;
+
+function TSuffixTrieNode<T>.Exists(const P: PChar; out AValue: TSuffixTrieNode<T>;
+  AExactMatch: Boolean): Boolean;
+begin
+  if AExactMatch then
+    Result := FindExact(P, AValue)
+  else
+    Result := Find(P, AValue);
 end;
 
 function TSuffixTrieNode<T>.Find(const P: PChar; out AValue: TSuffixTrieNode<T>): Boolean;
@@ -302,6 +331,13 @@ begin
   FCount := 0;
 end;
 
+function TSvStringTrie<T>.ContainsKey(const AKey: string; const AExactMatch: Boolean): Boolean;
+var
+  val: T;
+begin
+  Result := TryGetValue(AKey, val, AExactMatch);
+end;
+
 constructor TSvStringTrie<T>.Create(ASearchFromStartOnly: Boolean);
 begin
   inherited Create;
@@ -353,6 +389,19 @@ end;
 
 function TSvStringTrie<T>.Exists(const S: String; out AValue: T; AExactMatch: Boolean): Boolean;
 var
+  node: TSuffixTrieNode<T>;
+begin
+  Result := Exists(S, node, AExactMatch);
+
+  if Result then
+    AValue := node.Value
+  else
+    AValue := System.Default(T);
+end;
+
+function TSvStringTrie<T>.Exists(const S: String; out AValue: TSuffixTrieNode<T>;
+  AExactMatch: Boolean): Boolean;
+var
   sVal: string;
 begin
   Result := FRoot <> nil;
@@ -365,16 +414,17 @@ begin
 
     Result := FRoot.Exists(@sVal[1], AValue, AExactMatch);
   end;
+end;
 
-  if not Result then
-    AValue := System.Default(T);
+function TSvStringTrie<T>.GetEnumerator: TPairEnumerator;
+begin
+  Result := TPairEnumerator.Create(Self);
 end;
 
 procedure TSvStringTrie<T>.Remove(const S: string);
 var
   aNode, aNodeToFind, aNodeToFree: TSuffixTrieNode<T>;
   c: TAlpha;
-  sVal: string;
 begin
   if not FSearchFromStart then
     raise ESvTrieException.Create('Cannot remove from suffix trie')
@@ -383,12 +433,7 @@ begin
     if not Assigned(FRoot) then
       Exit;
 
-    if FCaseSensitive then
-      sVal := S
-    else
-      sVal := UpperCase(S, loInvariantLocale);
-
-    if FRoot.FindExact(@sVal[1], aNode) then
+    if Exists(S, aNode, True) then
     begin
       if aNode.LastCharAdded then
       begin
@@ -461,19 +506,13 @@ function TSvStringTrie<T>.TryGetValues(const S: string): TList<T>;
 var
   aNode: TSuffixTrieNode<T>;
   lst: TList<T>;
-  sVal: string;
 begin
   Result := TList<T>.Create;
   if not Assigned(FRoot) then
     Exit;
 
-  if FCaseSensitive then
-    sVal := S
-  else
-    sVal := UpperCase(S, loInvariantLocale);
-
   lst := Result;
-  if FRoot.Find(@sVal[1], aNode) then
+  if Exists(S, aNode, False) then
   begin
     //if not aNode.LastCharAdded then
   //    lst.Add(aNode.Value);
@@ -508,6 +547,54 @@ begin
     end;
     nExtracted: ;
   end;
+end;
+
+{ TSvStringTrie<T>.TPairEnumerator }
+
+constructor TSvStringTrie<T>.TPairEnumerator.Create(ATrie: TSvStringTrie<T>);
+var
+  ix: Integer;
+begin
+  inherited Create;
+  FTrie := ATrie;
+  FIndex := -1;
+
+  SetLength(FItems, FTrie.Count);
+  ix := 0;
+  FTrie.Traverse(procedure(const AKey: string; ANode: TSuffixTrieNode<T>)
+    begin
+      FItems[ix].Key := AKey;
+      FItems[ix].Value := ANode.Value;
+      Inc(ix);
+    end);
+end;
+
+destructor TSvStringTrie<T>.TPairEnumerator.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TSvStringTrie<T>.TPairEnumerator.DoGetCurrent: TPair<string, T>;
+begin
+  Result := GetCurrent;
+end;
+
+function TSvStringTrie<T>.TPairEnumerator.DoMoveNext: Boolean;
+begin
+  Result := MoveNext;
+end;
+
+function TSvStringTrie<T>.TPairEnumerator.GetCurrent: TPair<string, T>;
+begin
+  Result := FItems[FIndex];
+end;
+
+function TSvStringTrie<T>.TPairEnumerator.MoveNext: Boolean;
+begin
+  if FIndex >= Length(FItems) then
+    Exit(False);
+  Inc(FIndex);
+  Result := FIndex < Length(FItems);
 end;
 
 end.

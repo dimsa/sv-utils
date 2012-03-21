@@ -127,10 +127,10 @@ end;
 procedure TestTSvStringTrie.TestEnumerator;
 var
   ix: Integer;
-  pair: TPair<string,TestRec>;
+  pair: TPair<string,TestObj>;
   dict: TDictionary<Integer, Boolean>;
 begin
- { TestAdd;
+  TestAdd;
   ix := 0;
   dict := TDictionary<Integer, Boolean>.Create(FTrie.Count);
   try
@@ -145,7 +145,7 @@ begin
     CheckEquals(ix, ITER_SIZE);
   finally
     dict.Free;
-  end;    }
+  end;
 end;
 
 procedure TestTSvStringTrie.TestFind;
