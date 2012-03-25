@@ -27,6 +27,7 @@ type
   protected
     procedure SimpleEvent(Sender: TObject);
     procedure SimpleEvent2(Sender: TObject);
+    procedure SimpleEvent3(Sender: TObject);
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -82,6 +83,12 @@ begin
   Inc(FEventCount);
 end;
 
+procedure TestTMulticastEvent.SimpleEvent3(Sender: TObject);
+begin
+  Status('Simple Event3 called');
+  Inc(FEventCount);
+end;
+
 procedure TestTMulticastEvent.TearDown;
 begin
   inherited;
@@ -119,7 +126,15 @@ end;
 
 procedure TestTDelegate.TestIndexOf;
 begin
-  //
+  FEvent.Add(Self.SimpleEvent);
+
+  CheckEquals(0, FEvent.IndexOf(Self.SimpleEvent));
+
+  FEvent.Add(Self.SimpleEvent2);
+
+  CheckEquals(0, FEvent.IndexOf(Self.SimpleEvent2));
+
+  CheckEquals(-1, FEvent.IndexOf(Self.SimpleEvent3));
 end;
 
 procedure TestTDelegate.TestRemoveEventListener;
