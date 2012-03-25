@@ -50,6 +50,7 @@ type
     property Delegate: IDelegate<T> read GetDelegate;
     property Enumerator: TEnumerator<T> read GetEnumerator;
     function Count: Integer;
+    function IndexOf(const AHandler: T): Integer;
   end;
 
 { TDelegateImpl<T> }
@@ -76,6 +77,7 @@ type
     function GetDelegate: IDelegate<T>;
     function GetEnumerator: TEnumerator<T>;
     function Count: Integer;
+    function IndexOf(const AHandler: T): Integer;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -94,7 +96,7 @@ type
 
     procedure Add(const Handler: T);
     procedure Remove(const Handler: T);
-
+    function IndexOf(const Handler: T): Integer;
     property Count: Integer read GetCount;
   end;
 
@@ -158,11 +160,22 @@ begin
   Result := FList.GetEnumerator;
 end;
 
+function TDelegateContainerImpl<T>.IndexOf(const AHandler: T): Integer;
+begin
+  {TODO -oLinas -cGeneral : fix TMethod comparer for TList}
+  Result := FList.IndexOf(AHandler);
+end;
+
 { TDelegate<T> }
 
 class operator TDelegate<T>.Implicit(var Delegate: TDelegate<T>): IDelegate<T>;
 begin
   Result := Delegate.GetContainer.Delegate;
+end;
+
+function TDelegate<T>.IndexOf(const Handler: T): Integer;
+begin
+  Result := GetContainer.IndexOf(Handler);
 end;
 
 function TDelegate<T>.GetContainer: IDelegateContainer<T>;
