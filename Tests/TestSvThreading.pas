@@ -195,7 +195,7 @@ end;
 {$HINTS ON}
 initialization
   // Register any test cases with the test runner
-  RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 3));
-  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 3));
+  RegisterTest(TRepeatedTest.Create(TestTSvFuture.Suite, 1));
+  RegisterTest(TRepeatedTest.Create(TestTSvParallel.Suite, 1));
 end.
 

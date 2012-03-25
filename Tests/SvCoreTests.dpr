@@ -17,7 +17,6 @@ program SvCoreTests;
 {$R *.dres}
 
 uses
- // FastMM4 in 'FastMM4.pas',
   Forms,
   TestFramework,
   GUITestRunner,
@@ -33,7 +32,9 @@ uses
   SvRttiUtils in '..\Core\SvRttiUtils.pas',
   SvContainers in '..\Core\SvContainers.pas',
   TestSvContainers in 'TestSvContainers.pas',
-  SvCollections.Tries in '..\Core\SvCollections.Tries.pas';
+  SvCollections.Tries in '..\Core\SvCollections.Tries.pas',
+  TestSvEvents in 'TestSvEvents.pas',
+  SvDelegates in '..\Core\SvDelegates.pas';
 
 {$R *.RES}
 

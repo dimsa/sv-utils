@@ -30,7 +30,7 @@ unit SvDesignPatterns;
 interface
 
 uses
-  SysUtils, Generics.Collections, Rtti, SyncObjs;
+  SysUtils, Generics.Collections, Rtti, SyncObjs, SvRttiUtils;
 
 type
   EFactoryMethodKeyAlreadyRegisteredException = class(Exception);
@@ -281,7 +281,6 @@ type
 implementation
 
 uses
-  SvRttiUtils,
   Variants;
 
 { TAbstractFactory<TKey, TBaseType> }
