@@ -30,11 +30,13 @@ unit SvDelegates;
 interface
 
 uses
-  Generics.Collections;
+  SysUtils, Generics.Collections;
 
 { IDelegate<T> }
 
 type
+  ESvDelegateException = class(Exception);
+
   IDelegate<T> = interface
     ['{ADBC29C1-4F3D-4E4C-9A79-C805E8B9BD92}']
     procedure Add(const Handler: T);
@@ -85,13 +87,13 @@ type
 
 { TDelegate<T> }
 
-  TDelegate<T> = record
+  SvDelegate<T> = record
   private
     FContainer: IDelegateContainer<T>;
     function GetContainer: IDelegateContainer<T>;
     function GetCount: Integer;
   public
-    class operator Implicit(var Delegate: TDelegate<T>): IDelegate<T>;
+    class operator Implicit(var Delegate: SvDelegate<T>): IDelegate<T>;
     function GetEnumerator: TEnumerator<T>;
 
     procedure Add(const Handler: T);
@@ -107,6 +109,9 @@ type
 
 implementation
 
+uses
+  TypInfo;
+
 { TDelegateImpl<T> }
 
 constructor TDelegateImpl<T>.Create(List: TList<T>);
@@ -118,7 +123,12 @@ end;
 { TDelegateImpl<T>.IDelegate<T> }
 
 procedure TDelegateImpl<T>.Add(const Event: T);
+var
+  LTypeInfo: PTypeInfo;
 begin
+  LTypeInfo := TypeInfo(T);
+  Assert(LTypeInfo.Kind in [tkInterface, tkMethod], 'Delegate must be a method');
+
   FList.Add(Event);
 end;
 
@@ -168,39 +178,39 @@ end;
 
 { TDelegate<T> }
 
-class operator TDelegate<T>.Implicit(var Delegate: TDelegate<T>): IDelegate<T>;
+class operator SvDelegate<T>.Implicit(var Delegate: SvDelegate<T>): IDelegate<T>;
 begin
   Result := Delegate.GetContainer.Delegate;
 end;
 
-function TDelegate<T>.IndexOf(const Handler: T): Integer;
+function SvDelegate<T>.IndexOf(const Handler: T): Integer;
 begin
   Result := GetContainer.IndexOf(Handler);
 end;
 
-function TDelegate<T>.GetContainer: IDelegateContainer<T>;
+function SvDelegate<T>.GetContainer: IDelegateContainer<T>;
 begin
   if FContainer = nil then
     FContainer := TDelegateContainerImpl<T>.Create;
   Result := FContainer;
 end;
 
-function TDelegate<T>.GetCount: Integer;
+function SvDelegate<T>.GetCount: Integer;
 begin
   Result := GetContainer.Count;
 end;
 
-function TDelegate<T>.GetEnumerator: TEnumerator<T>;
+function SvDelegate<T>.GetEnumerator: TEnumerator<T>;
 begin
   Result := GetContainer.GetEnumerator;
 end;
 
-procedure TDelegate<T>.Add(const Handler: T);
+procedure SvDelegate<T>.Add(const Handler: T);
 begin
   GetContainer.Delegate.Add(Handler);
 end;
 
-procedure TDelegate<T>.Remove(const Handler: T);
+procedure SvDelegate<T>.Remove(const Handler: T);
 begin
   GetContainer.Delegate.Remove(Handler);
 end;

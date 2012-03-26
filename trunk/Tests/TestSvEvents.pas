@@ -37,7 +37,7 @@ type
 
   TestTDelegate = class(TestTMulticastEvent)
   private
-    FEvent: TDelegate<TSimpleMethod>;
+    FEvent: SvDelegate<TSimpleMethod>;
   public
     procedure SetUp; override;
     procedure TearDown; override;
@@ -49,7 +49,7 @@ type
 
   TestTAnonDelegate = class(TestTMulticastEvent)
   private
-    FEvent: TDelegate<TAnonMethod>;
+    FEvent: SvDelegate<TAnonMethod>;
   published
     procedure TestAddEventListener;
     procedure TestRemoveEventListener;
