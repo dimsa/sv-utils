@@ -18,7 +18,6 @@ uses
   DSharp.Bindings.Collections,
   DSharp.Bindings.CollectionView,
   DSharp.Bindings.Notifications,
-  DSharp.Collections,
   DSharp.Core.DataTemplates,
   DSharp.Core.DataTemplates.Default,
   DSharp.Core.Events,
