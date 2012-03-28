@@ -31,9 +31,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, SvBindings, DSharp.Bindings
-
-  ,DSharp.Bindings.VCLControls, DSharp.Bindings.VCLControls.SpinEdit, Spin, StdCtrls, ComCtrls, ExtCtrls;
+  Dialogs, SvBindings, DSharp.Bindings, Spin, StdCtrls, ComCtrls, ExtCtrls,
+  DSharp.Bindings.VCLControls, DSharp.Bindings.VCLControls.SpinEdit;
 
 type
   TfrmTest = class(TForm, IBindableView)
@@ -42,10 +41,11 @@ type
     [Bind('Name', 'Caption')]
     lbl1: TLabel;
     Memo1: TMemo;
+    [Bind('IsEnabled', 'Enabled')]
     Button1: TButton;
     [Bind('IsChecked', 'Checked')]
     CheckBox1: TCheckBox;
-    [Bind('Items', 'Items')]
+   // [Bind('Items', 'Items')]
     ListBox1: TListBox;
     [Bind('ID', 'Value')]
     SpinEdit1: TSpinEdit;
