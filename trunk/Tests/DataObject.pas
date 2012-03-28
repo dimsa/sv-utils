@@ -30,7 +30,7 @@ unit DataObject;
 interface
 
 uses
-  Classes, Graphics;
+  Classes, Graphics, DSharp.Core.PropertyChangedBase, Rtti;
 
 const
   CNAME = 'Foobar';
@@ -38,7 +38,7 @@ const
   CPOINTS = 5;
 
 type
-  TData = class
+  TData = class(TPropertyChangedBase)
   private
     FName: string;
     FID: Integer;
@@ -47,6 +47,15 @@ type
     FColor: TColor;
     FIsChecked: Boolean;
     FItems: TStrings;
+    FIsEnabled: Boolean;
+    procedure SetName(const Value: string);
+    procedure SetID(const Value: Integer);
+    procedure SetDate(const Value: TDateTime);
+    procedure SetPoints(const Value: Integer);
+    procedure SetColor(const Value: TColor);
+    procedure SetIsChecked(const Value: Boolean);
+    procedure SetIsEnabled(const Value: Boolean);
+    procedure SetItems(const Value: TStrings);
   public
     constructor Create;
     destructor Destroy; override;
@@ -54,19 +63,22 @@ type
     procedure SetDefaults();
     procedure Clear();
 
-    property Name: string read FName write FName;
-    property ID: Integer read FID write FID;
-    property Date: TDateTime read FDate write FDate;
-    property Points: Integer read FPoints write FPoints;
-    property Color: TColor read FColor write FColor;
-    property IsChecked: Boolean read FIsChecked write FIsChecked;
+    property Name: string read FName write SetName;
+    property ID: Integer read FID write SetID;
+    property Date: TDateTime read FDate write SetDate;
+    property Points: Integer read FPoints write SetPoints;
+    property Color: TColor read FColor write SetColor;
+    property IsChecked: Boolean read FIsChecked write SetIsChecked;
+    property IsEnabled: Boolean read FIsEnabled write SetIsEnabled;
     property Items: TStrings read FItems write FItems;
   end;
 
 implementation
 
 uses
-  DateUtils;
+  DateUtils,
+  TypInfo,
+  StrUtils;
 
 { TData }
 
@@ -88,6 +100,18 @@ begin
   inherited Destroy;
 end;
 
+procedure TData.SetColor(const Value: TColor);
+begin
+  FColor := Value;
+  DoPropertyChanged('Color');
+end;
+
+procedure TData.SetDate(const Value: TDateTime);
+begin
+  FDate := Value;
+  DoPropertyChanged('Date');
+end;
+
 procedure TData.SetDefaults;
 begin
   FName := CNAME;
@@ -96,7 +120,44 @@ begin
   FPoints := CPOINTS;
   FColor := clBlack;
   FIsChecked := True;
+  FIsEnabled := False;
   FItems.AddStrings(TArray<string>.Create(CNAME, '2', '3'));
+end;
+
+procedure TData.SetID(const Value: Integer);
+begin
+  FID := Value;
+  DoPropertyChanged('ID');
+end;
+
+procedure TData.SetIsChecked(const Value: Boolean);
+begin
+  FIsChecked := Value;
+  DoPropertyChanged('IsChecked');
+end;
+
+procedure TData.SetIsEnabled(const Value: Boolean);
+begin
+  FIsEnabled := Value;
+  DoPropertyChanged('IsEnabled');
+end;
+
+procedure TData.SetItems(const Value: TStrings);
+begin
+  FItems := Value;
+ // DoPropertyChanged('View');
+end;
+
+procedure TData.SetName(const Value: string);
+begin
+  FName := Value;
+  DoPropertyChanged('Name');
+end;
+
+procedure TData.SetPoints(const Value: Integer);
+begin
+  FPoints := Value;
+  DoPropertyChanged('Points');
 end;
 
 end.

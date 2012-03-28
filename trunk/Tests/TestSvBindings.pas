@@ -43,7 +43,7 @@ end;
 
 procedure TestTDataBindManager.TearDown;
 begin
-  FForm.Release;
+  FForm.Free;
   FData.Free;
 end;
 
@@ -55,14 +55,19 @@ begin
 
   FForm.Show;
 
-  CheckEqualsString(CNAME, FForm.edt1.Text);
+  CheckEqualsString(FData.Name, FForm.edt1.Text);
   CheckTrue(FForm.CheckBox1.Checked);
-  CheckEquals(CID, FForm.SpinEdit1.Value);
-  CheckTrue(SameDate(Today, FForm.DateTimePicker1.Date));
-  CheckEquals(CPOINTS, FForm.TrackBar1.Position);
-  CheckEquals(clBlack, FForm.ColorBox1.Selected);
+  CheckEquals(FData.ID, FForm.SpinEdit1.Value);
+  CheckTrue(SameDate(FData.Date, FForm.DateTimePicker1.Date));
+  CheckEquals(FData.Points, FForm.TrackBar1.Position);
+  CheckEquals(FData.Color, FForm.ColorBox1.Selected);
+  FData.Color := clGreen;
+  CheckEquals(FData.Color, FForm.ColorBox1.Selected);
+  CheckFalse(FForm.Button1.Enabled);
+  FData.IsEnabled := True;
+  CheckTrue(FForm.Button1.Enabled, 'Button Enabled hasnt changed');
   {TODO -oLinas -cGeneral : fix bindings for lists}
-  CheckEquals(3, FForm.ListBox1.Items.Count);
+ // CheckEquals(3, FForm.ListBox1.Items.Count);
 end;
 
 initialization
