@@ -482,7 +482,7 @@ begin
     FInjectedValues.Add(AKey, list);
   end;
 
-  list.Add(AFieldOrPropName, AValue);
+  list.AddOrSetValue(AFieldOrPropName, AValue);
 end;
 
 function TAbstractFactory<TKey, TBaseType>.IsRegistered(const AKey: TKey): Boolean;
