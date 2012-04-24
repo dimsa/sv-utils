@@ -267,6 +267,7 @@ type
     /// <param name="AValueFactory">Anonymous method which gets value</param>
     /// <param name="AOwnsObjects">Boolean property to specify if lazy value should free it's value when it goes out of scope</param>
     constructor Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
+    constructor CreateLazy(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
 
     procedure Assign(const AValue: T);
     function IsValueCreated: Boolean;
@@ -823,6 +824,11 @@ end;
 constructor SvLazy<T>.Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean);
 begin
   FLazy := TSvLazy<T>.Create(AValueFactory, AOwnsObjects);
+end;
+
+constructor SvLazy<T>.CreateLazy(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean);
+begin
+  Create(AValueFactory, AOwnsObjects);
 end;
 
 function SvLazy<T>.GetValue: T;
