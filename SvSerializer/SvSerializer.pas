@@ -221,6 +221,7 @@ type
     function UnMarshall<T: record>(const AFromString: string; AEncoding: TEncoding): T; overload;
 
     function GetErrors(): TArray<string>;
+    function GetErrorsAsString(): string;
 
     class function CreateType<T: class>: T; overload;
     class function CreateType(ATypeInfo: PTypeInfo): TObject; overload;
@@ -491,6 +492,19 @@ end;
 function TSvSerializer.GetErrors: TArray<string>;
 begin
   Result := FFactory.FErrors.ToArray;
+end;
+
+function TSvSerializer.GetErrorsAsString: string;
+var
+  LErrors: TList<string>;
+  I: Integer;
+begin
+  Result := '';
+  LErrors := FFactory.FErrors;
+  for I := 0 to LErrors.Count - 1 do
+  begin
+    Result := Result + LErrors[I] + #13#10;
+  end;
 end;
 
 function TSvSerializer.GetObject(const AName: string): TObject;
