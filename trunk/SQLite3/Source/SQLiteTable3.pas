@@ -229,6 +229,7 @@ type
       /// To encrypt your database you must use http://system.data.sqlite.org/index.html/doc/trunk/www/index.wiki or
       /// http://sourceforge.net/projects/wxcode/files/Components/wxSQLite3/ library file (rename it to sqlite3.dll) </param>
     {$ENDREGION}
+    constructor Create(); reintroduce; overload;
     constructor Create(const AFileName: string; DefaultEncoding: TSQLiteDBEncoding = seUTF8;
       const Password: AnsiString = ''; AOwner: TComponent = nil); reintroduce; overload;
     constructor Create(AOwner: TComponent); reintroduce; overload;
@@ -1034,6 +1035,11 @@ end;
 constructor TSQLiteDatabase.Create(AOwner: TComponent);
 begin
   //inherited Create(AOwner);
+  Create('');
+end;
+
+constructor TSQLiteDatabase.Create;
+begin
   Create('');
 end;
 
