@@ -643,7 +643,7 @@ type
     function Value: Variant;
     function ValueDef(const Def: Variant): Variant;
   end;
-
+  {$IFNDEF CPUX64}
   /// <summary>
   /// TSQLiteUniTable enumerator
   ///  for ARec in Dataset do...
@@ -659,6 +659,7 @@ type
     function MoveNext: Boolean;
     property Current: Variant read GetCurrent;
   end;
+  {$ENDIF}
 
   /// <summary>
   /// Interface of SQLite table
@@ -677,9 +678,9 @@ type
     function GetFieldIndex(const FieldName: string): integer;
     function GetFieldByName(const FieldName: string): TSQLiteField;
     procedure SetFieldByName(const FieldName: string; const Value: TSQLiteField);
-
+    {$IFNDEF CPUX64}
     function GetEnumerator: TUniTableEnumerator;
-
+    {$ENDIF}
     function FindField(const AFieldName: string): TSQLiteField;
     function FieldAsInteger(I: Cardinal): int64;
     function FieldAsBlob(I: Cardinal): TMemoryStream;
@@ -731,7 +732,9 @@ type
     function GetFieldCount: Cardinal;
     function GetRow: Cardinal;
     function GetEOF: Boolean;
+    {$IFNDEF CPUX64}
     function GetCurrentRec: Variant;
+    {$ENDIF}
   protected
     procedure SetFields(I: Cardinal; const Value: Variant);
     function GetFieldsVal(I: Cardinal): Variant; virtual;
@@ -741,10 +744,10 @@ type
     constructor Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
     destructor Destroy; override;
-
+    {$IFNDEF CPUX64}
     function GetEnumerator: TUniTableEnumerator;
     property CurrentRec: Variant read GetCurrentRec;
-
+    {$ENDIF}
     /// <summary>
     /// Checks if fieldname exists
     /// </summary>
@@ -793,6 +796,7 @@ uses
   {$ENDIF}
   TypInfo;
 
+{$IFNDEF CPUX64}
 type
   { A custom variant type that implements the mapping from the property names
     to the DataSet fields. }
@@ -873,6 +877,8 @@ begin
     fld.Value := Variant(Value);
   end;}
 end;
+
+{$ENDIF}
 
 const
   //default supported column types defined in sqlite db
@@ -2458,11 +2464,12 @@ begin
   end;
 
 end;
-
+{$IFNDEF CPUX64}
 function TSQLiteUniTable.GetEnumerator: TUniTableEnumerator;
 begin
   Result := TUniTableEnumerator.Create(Self);
 end;
+{$ENDIF}
 
 function TSQLiteUniTable.GetEOF: Boolean;
 begin
@@ -2564,10 +2571,12 @@ begin
   Result := FColNames[I];
 end;
 
+{$IFNDEF CPUX64}
 function TSQLiteUniTable.GetCurrentRec: Variant;
 begin
   Result := VarDataRecordCreate(Self);
 end;
+{$ENDIF}
 
 function TSQLiteUniTable.GetField(I: Integer): TSQLiteField;
 begin
@@ -3653,6 +3662,7 @@ begin
   Result := sqlite3_value_text16(ArgValue^);
 end;
 
+{$IFNDEF CPUX64}
 { TSQLiteUniTable.TUniTableEnumerator }
 
 constructor TUniTableEnumerator.Create(ATable: TSQLiteUniTable);
@@ -3684,14 +3694,18 @@ begin
     Result := FDataSet.Next;
 end;
 
+{$ENDIF}
+
 initialization
   TSQLiteDatabase.FColumnTypes := TDictionary<string,Integer>.Create(DEF_COLCOUNT);
   TSQLiteDatabase.InitDefaultColumnTypes;
-
+  {$IFNDEF CPUX64}
   VarDataRecordType := TVarDataRecordType.Create;
-
+  {$ENDIF}
 finalization
   TSQLiteDatabase.FColumnTypes.Free;
+  {$IFNDEF CPUX64}
   FreeAndNil(VarDataRecordType);
+  {$ENDIF}
 end.
 
