@@ -338,7 +338,7 @@ cdecl; // 'sqlite3_bind_text';
     }
 
 
- SQLite_Handle: Cardinal = 0;
+ SQLite_Handle: THandle = 0;
 
  sqlite3_enable_shared_cache: function(Value: integer): integer; cdecl; // 'sqlite3_enable_shared_cache';
 

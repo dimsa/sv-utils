@@ -307,7 +307,7 @@ type
       /// <param name="SQL">update statement</param>
       /// <param name="BlobData">BlobData stream</param>
     {$ENDREGION}
-    procedure UpdateBlob(const SQL: String; BlobData: TStream); deprecated;
+    procedure UpdateBlob(const SQL: String; BlobData: TStream); deprecated 'Use prepared statements to add blobs as parameters';
     /// <summary>
     /// Starts new transaction. Speeds up drastically data inserts, updates, deletes.
     /// </summary>
@@ -363,10 +363,10 @@ type
     //adds collate named SYSTEM for correct data sorting by user's locale
     Procedure AddSystemCollate;
     procedure ParamsClear;
-    procedure AddParamInt(const name: string; value: int64); deprecated;
-    procedure AddParamFloat(const name: string; value: double); deprecated;
-    procedure AddParamText(const name: string; const value: string); deprecated;
-    procedure AddParamNull(const name: string); deprecated;
+    procedure AddParamInt(const name: string; value: int64); deprecated 'Use prepared statements to add parameters';
+    procedure AddParamFloat(const name: string; value: double); deprecated 'Use prepared statements to add parameters';
+    procedure AddParamText(const name: string; const value: string); deprecated 'Use prepared statements to add parameters';
+    procedure AddParamNull(const name: string); deprecated 'Use prepared statements to add parameters';
     {$REGION 'Doc'}
       /// <summary>
       /// Attached another database into the current one with the given alias (name)
@@ -665,19 +665,16 @@ type
   /// Interface of SQLite table
   /// </summary>
   ISQLiteTable = interface
-    procedure SetField(I: Integer; const Value: TSQLiteField);
     function GetFieldCount: Cardinal;
     function GetRow: Cardinal;
     function GetEOF: Boolean;
     function GetFieldsAsString(I: Cardinal): string;
     function GetField(I: Integer): TSQLiteField;
-    procedure SetFields(I: Cardinal; const Value: Variant);
     function GetFieldsVal(I: Cardinal): Variant;
     function GetColumns(I: integer): string;
     function GetFieldByNameAsString(const FieldName: string): string;
     function GetFieldIndex(const FieldName: string): integer;
     function GetFieldByName(const FieldName: string): TSQLiteField;
-    procedure SetFieldByName(const FieldName: string; const Value: TSQLiteField);
     {$IFNDEF CPUX64}
     function GetEnumerator: TUniTableEnumerator;
     {$ENDIF}
@@ -694,9 +691,9 @@ type
     property EOF: Boolean read GetEOF;
     property FieldCount: Cardinal read GetFieldCount;
     property FieldsAsString[I: Cardinal]: string read GetFieldsAsString;
-    property Fields[I: Integer]: TSQLiteField read GetField write SetField;
-    property FieldsVal[I: Cardinal]: Variant read GetFieldsVal write SetFields;
-    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName write SetFieldByName; default;
+    property Fields[I: Integer]: TSQLiteField read GetField;
+    property FieldsVal[I: Cardinal]: Variant read GetFieldsVal;
+    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName; default;
     property FieldByNameAsString[const FieldName: string]: string read GetFieldByNameAsString;
     property FieldIndex[const FieldName: string]: integer read GetFieldIndex;
     property Columns[I: integer]: string read GetColumns;
@@ -724,11 +721,8 @@ type
     function GetFieldByNameAsString(const FieldName: string): string;
     function GetFieldIndex(const FieldName: string): integer;
     function GetFieldByName(const FieldName: string): TSQLiteField;
-    procedure SetFieldByName(const FieldName: string; const Value: TSQLiteField);
     procedure GetDataTypes;
     function GetField(I: Integer): TSQLiteField;
-
-    procedure SetField(I: Integer; const Value: TSQLiteField);
     function GetFieldCount: Cardinal;
     function GetRow: Cardinal;
     function GetEOF: Boolean;
@@ -736,9 +730,7 @@ type
     function GetCurrentRec: Variant;
     {$ENDIF}
   protected
-    procedure SetFields(I: Cardinal; const Value: Variant);
     function GetFieldsVal(I: Cardinal): Variant; virtual;
-
   public
     constructor Create(DB: TSQLiteDatabase); overload; //use with caution!
     constructor Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt); overload;
@@ -766,9 +758,9 @@ type
     property EOF: Boolean read GetEOF;
     property FieldCount: Cardinal read GetFieldCount;
     property FieldsAsString[I: Cardinal]: string read GetFieldsAsString;
-    property Fields[I: Integer]: TSQLiteField read GetField write SetField;
-    property FieldsVal[I: Cardinal]: Variant read GetFieldsVal write SetFields;
-    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName write SetFieldByName; default;
+    property Fields[I: Integer]: TSQLiteField read GetField;
+    property FieldsVal[I: Cardinal]: Variant read GetFieldsVal;
+    property FieldByName[const FieldName: string]: TSQLiteField read GetFieldByName; default;
     property FieldByNameAsString[const FieldName: string]: string read GetFieldByNameAsString;
     property FieldIndex[const FieldName: string]: integer read GetFieldIndex;
     property Columns[I: integer]: string read GetColumns;
@@ -868,6 +860,7 @@ function TVarDataRecordType.SetProperty(const V: TVarData; const Name: string; c
 {var
   fld: TField;}
 begin
+  Result := False;
   Assert(False, 'Cannot set field value for unidirectional table');
   { Find a field with the property's name. If there is one, set its value. }
  // fld := TVarDataRecordData(V).DataSet.FieldByName[Name];
@@ -2699,22 +2692,6 @@ begin
     end;
   end;
   Result := not fEOF;
-end;
-
-procedure TSQLiteUniTable.SetField(I: Integer; const Value: TSQLiteField);
-begin
-  //
-end;
-
-procedure TSQLiteUniTable.SetFieldByName(const FieldName: string; const Value: TSQLiteField);
-begin
-  {TODO -oLinas -cGeneral : implement update value}
-end;
-
-
-procedure TSQLiteUniTable.SetFields(I: Cardinal; const Value: Variant);
-begin
-  {TODO -oLinas -cGeneral : finish field update}
 end;
 
 {SQliteParam }

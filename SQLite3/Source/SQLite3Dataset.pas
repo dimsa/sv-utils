@@ -405,6 +405,8 @@ begin
   inherited;
 end;
 
+
+{$HINTS OFF}
 function TSQLiteDataset.DoInitFields(AStmt: TSQLitePreparedStatement): TSQLiteUniTable;
 var
   i: Integer;
@@ -446,6 +448,7 @@ begin
     FIniting := False;
   end;
 end;
+{$HINTS ON}
 
 procedure TSQLiteDataset.DoInternalOpen(tbl: TSQLiteUniTable);
 var

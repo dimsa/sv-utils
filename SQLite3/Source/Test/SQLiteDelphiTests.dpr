@@ -23,6 +23,7 @@ uses
   GUITestRunner,
   TextTestRunner,
   TestSQLiteTable3 in 'TestSQLiteTable3.pas',
+  SQLite3 in '..\SQLite3.pas',
   SQLiteTable3 in '..\SQLiteTable3.pas';
 
 {$R *.RES}

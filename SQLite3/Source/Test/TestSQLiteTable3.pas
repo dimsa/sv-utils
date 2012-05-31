@@ -162,7 +162,9 @@ type
     procedure TestFieldAsString;
     procedure TestFieldAsDouble;
     procedure TestNext;
+    {$IFNDEF CPUX64}
     procedure TestForInLoop;
+    {$ENDIF}
   end;
 
 implementation
@@ -1452,6 +1454,7 @@ begin
   Check(ReturnValue <> nil);
 end;
 
+{$IFNDEF CPUX64}
 procedure TestTSQLiteUniTable.TestForInLoop;
 var
   ARec: Variant;
@@ -1484,6 +1487,7 @@ begin
 
   Check(iCount = iCorrectCount);
 end;
+{$ENDIF}
 
 procedure TestTSQLiteUniTable.TestFieldAsInteger;
 var
