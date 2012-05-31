@@ -167,6 +167,13 @@ type
     {$ENDIF}
   end;
 
+  TestSQLiteGlobals = class(TTestCase)
+  published
+    {$IFDEF LOAD_DYNAMICALLY}
+    procedure TestLibraryDynamicLoad();
+    {$ENDIF}
+  end;
+
 implementation
 
 uses
@@ -1578,12 +1585,33 @@ end;
 {$HINTS ON}
 {$WARNINGS ON}
 
+{ TestSQLiteGlobals }
+
+{$IFDEF LOAD_DYNAMICALLY}
+procedure TestSQLiteGlobals.TestLibraryDynamicLoad;
+var
+  sAppDir, sDllDir: string;
+begin
+  sAppDir := IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0)));
+  sDllDir := IncludeTrailingPathDelimiter(sAppDir + 'Bin');
+
+  CheckTrue(ForceDirectories(sDllDir));
+  CheckTrue(CopyFile(PChar(sAppDir + SQLiteDLL), PChar(sDllDir + SQLiteDLL), False));
+
+  CheckTrue(LoadSQLite(sDllDir + SQLiteDLL));
+end;
+{$ENDIF}
+
+
 initialization
   // Register any test cases with the test runner
+  {$IFNDEF LOAD_DYNAMICALLY}
   RegisterTest(TestTSQLiteDatabase.Suite);
   RegisterTest(TestTSQLiteTable.Suite);
   RegisterTest(TestTSQLitePreparedStatement.Suite);
   RegisterTest(TestTSQLiteField.Suite);
   RegisterTest(TestTSQLiteUniTable.Suite);
+  {$ENDIF}
+  RegisterTest(TestSQLiteGlobals.Suite);
 end.
 

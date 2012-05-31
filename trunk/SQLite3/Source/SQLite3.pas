@@ -27,7 +27,6 @@ const
   SQLiteDLL = 'libsqlite3.dylib';
   //{$LINK libsqlite3}
 {$ENDIF}
-
 // Return values for sqlite3_exec() and sqlite3_step()
 
 const
@@ -570,7 +569,9 @@ begin
 end;
 
 initialization
+  {$IFNDEF LOAD_DYNAMICALLY}
   LoadSQLite(SQLiteDLL);
+  {$ENDIF}
 
 finalization
   UnloadSQLite;
