@@ -10,6 +10,7 @@ Based on [http://www.itwriting.com/blog/?page_id=659 Tim Anderson's] SQLite wrap
 ===Features===
   * Support multiple platforms (currently supports Windows, Mac OSX, iOS (_not tested yet_))
   * Full unicode support
+  * 64 bit support
   * Takes advantage of the new Delphi language features (Generics, closures, etc.)
   * Fast
   * Simple to use
