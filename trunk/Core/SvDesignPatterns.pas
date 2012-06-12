@@ -232,6 +232,9 @@ type
     function ValueCreated: Boolean;
     procedure SetValue(const AValue: T);
     function GetValue: T;
+    function GetDisableCache: Boolean;
+    procedure SetDisableCache(const Value: Boolean);
+    property DisableCacheForNextGet: Boolean read GetDisableCache write SetDisableCache;
     property Value: T read GetValue;
   end;
 
@@ -241,16 +244,20 @@ type
     FValueCreated: Boolean;
     FOwnsObjects: Boolean;
     FValue: T;
+    FDisableCache: Boolean;
     function GetValue: T;
   protected
     procedure SetValue(const AValue: T);
     function OwnsObjects: Boolean;
+    function GetDisableCache: Boolean;
+    procedure SetDisableCache(const Value: Boolean);
   public
     constructor Create(const AValueFactory: TFunc<T>; AOwnsObjects: Boolean = False);
     destructor Destroy; override;
 
     function ValueCreated: Boolean;
 
+    property DisableCacheForNextGet: Boolean read GetDisableCache write SetDisableCache;
     property Value: T read GetValue;
   end;
   /// <summary>
@@ -260,6 +267,8 @@ type
   private
     FLazy: ISvLazy<T>;
     function GetValue: T;
+    function GetDisableCache: Boolean;
+    procedure SetDisableCache(const Value: Boolean);
   public
     /// <summary>
     /// Initializes lazy value with anonymous getValue factory
@@ -276,6 +285,7 @@ type
     class operator Implicit(const AValueFactory: TFunc<T>): SvLazy<T>; inline;
     class operator Implicit(const AValue: T): SvLazy<T>; inline;
 
+    property DisableCacheForNextGet: Boolean read GetDisableCache write SetDisableCache;
     property Value: T read GetValue;
   end;
 
@@ -772,20 +782,31 @@ begin
   inherited;
 end;
 
+function TSvLazy<T>.GetDisableCache: Boolean;
+begin
+  Result := FDisableCache;
+end;
+
 function TSvLazy<T>.GetValue: T;
 begin
-  if not FValueCreated then
+  if (not FValueCreated) or FDisableCache then
   begin
     FValue := FValueFactory();
     FValueCreated := True;
   end;
 
+  FDisableCache := False;
   Result := FValue;
 end;
 
 function TSvLazy<T>.OwnsObjects: Boolean;
 begin
   Result := FOwnsObjects;
+end;
+
+procedure TSvLazy<T>.SetDisableCache(const Value: Boolean);
+begin
+  FDisableCache := Value;
 end;
 
 procedure TSvLazy<T>.SetValue(const AValue: T);
@@ -831,6 +852,15 @@ begin
   Create(AValueFactory, AOwnsObjects);
 end;
 
+function SvLazy<T>.GetDisableCache: Boolean;
+begin
+  Result := False;
+  if Assigned(FLazy) then
+  begin
+    Result := FLazy.DisableCacheForNextGet;
+  end;
+end;
+
 function SvLazy<T>.GetValue: T;
 begin
   Result := FLazy.Value;
@@ -846,6 +876,12 @@ begin
   Result := False;
   if Assigned(FLazy) then
     Result := FLazy.ValueCreated;
+end;
+
+procedure SvLazy<T>.SetDisableCache(const Value: Boolean);
+begin
+  Assert(Assigned(FLazy));
+  FLazy.DisableCacheForNextGet := Value;
 end;
 
 class operator SvLazy<T>.Implicit(const ALazy: SvLazy<T>): T;

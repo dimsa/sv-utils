@@ -2688,7 +2688,6 @@ begin
   else
     begin
       SQLite3_reset(fStmt);
-      fDB.RaiseError('Could not retrieve data', fSQL);
     end;
   end;
   Result := not fEOF;
