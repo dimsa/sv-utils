@@ -162,9 +162,7 @@ type
     procedure TestFieldAsString;
     procedure TestFieldAsDouble;
     procedure TestNext;
-    {$IFNDEF CPUX64}
     procedure TestForInLoop;
-    {$ENDIF}
   end;
 
   TestSQLiteGlobals = class(TTestCase)
@@ -183,7 +181,7 @@ uses
 
 procedure TestTSQLiteDatabase.SetUp;
 begin
-  FSQLiteDatabase := TSQLiteDatabase.Create('test.db');
+  FSQLiteDatabase := TSQLiteDatabase.Create('..\test.db');
 end;
 
 procedure TestTSQLiteDatabase.TearDown;
@@ -279,9 +277,9 @@ var
   DB, DB2: TSQLiteDatabase;
   bOK: Boolean;
 begin
-  DeleteFile('encrypted.db');
+  DeleteFile('..\encrypted.db');
 
-  DB := TSQLiteDatabase.Create('encrypted.db', seUTF8, 'password');
+  DB := TSQLiteDatabase.Create('..\encrypted.db', seUTF8, 'password');
   try
     CheckTrue(DB <> nil);
 
@@ -292,7 +290,7 @@ begin
 
     DB.ExecSQL('INSERT INTO testtable ([OtherID], [Name], [Number]) VALUES (1, ''encrypted'', 100)');
     bOK := False;
-    DB2 := TSQLiteDatabase.Create('encrypted.db');
+    DB2 := TSQLiteDatabase.Create('..\encrypted.db');
     try
       try
         bOK := not DB2.TableExists('testtable');
@@ -330,13 +328,13 @@ var
   iInt: Integer;
 begin
   FSQLiteDatabase.Functions.AddScalarFunction('TestAbs', 1,
-    procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar)
+    procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPsqlite3_value)
     begin
-      case TSQLiteFunctions.GetValueType(ArgValue) of
+      case TSQLiteFunctions.GetValueType(ArgValue^) of
         SQLITE_INTEGER:
         begin
           TSQLiteFunctions.ResultAsInteger(sqlite3_context,
-            Abs(TSQLiteFunctions.ValueAsInteger(ArgValue)));
+            Abs(TSQLiteFunctions.ValueAsInteger(ArgValue^)));
         end;
         SQLITE_NULL:
         begin
@@ -344,12 +342,12 @@ begin
         end;
         SQLITE_FLOAT:
         begin
-          iVal := Abs(TSQLiteFunctions.ValueAsFloat(ArgValue));
+          iVal := Abs(TSQLiteFunctions.ValueAsFloat(ArgValue^));
           TSQLiteFunctions.ResultAsFloat(sqlite3_context, iVal);
         end;
         else
         begin
-          iInt := Abs(TSQLiteFunctions.ValueAsInteger(ArgValue));
+          iInt := Abs(TSQLiteFunctions.ValueAsInteger(ArgValue^));
           TSQLiteFunctions.ResultAsInteger(sqlite3_context, iInt);
         end;
       end;
@@ -383,16 +381,16 @@ var
 begin
   iVal := 0;
   FSQLiteDatabase.Functions.AddAggregateFunction('TestSum', 1,
-    procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar)
+    procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPsqlite3_value)
     begin
-      case TSQLiteFunctions.GetValueType(ArgValue) of
+      case TSQLiteFunctions.GetValueType(ArgValue^) of
         SQLITE_NULL:
         begin
           TSQLiteFunctions.ResultAsNull(sqlite3_context);
         end;
         SQLITE_FLOAT:
         begin
-          iVal := iVal + TSQLiteFunctions.ValueAsFloat(ArgValue);
+          iVal := iVal + TSQLiteFunctions.ValueAsFloat(ArgValue^);
         end;
       end;
     end,
@@ -553,7 +551,7 @@ var
   SQL: string;
 begin
   SQL := 'update testtable set picture = ? where ID = 5';
-  BlobData := TFileStream.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'Sunset.jpg',
+  BlobData := TFileStream.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + '..\Sunset.jpg',
    fmOpenRead or fmShareDenyNone);
   try
     FSQLiteDatabase.UpdateBlob(SQL, BlobData);
@@ -587,7 +585,7 @@ var
   stmt: TSQLitePreparedStatement;
   dst: TSQLiteUniTable;
 begin
-  DB := TSQLiteDatabase.Create('encrypted.db', seUTF8, 'password');
+  DB := TSQLiteDatabase.Create('..\encrypted.db', seUTF8, 'password');
   try
     CheckTrue(DB <> nil);
 
@@ -602,7 +600,7 @@ begin
           DB.ChangePassword('master');
           CheckTrue(True);
 
-          DB2 := TSQLiteDatabase.Create('encrypted.db', seUTF8, 'master');
+          DB2 := TSQLiteDatabase.Create('..\encrypted.db', seUTF8, 'master');
           try
             CheckTrue(DB2.TableExists('testtable'));
           finally
@@ -681,7 +679,7 @@ var
   dst: TSQLiteUniTable;
   iVal: Integer;
 begin
-  DB := TSQLiteDatabase.Create('test.db');
+  DB := TSQLiteDatabase.Create('..\test.db');
   try
     //prepare statement with param value = 10
     stmt := DB.GetPreparedStatement('select * from testtable where ID > ?', [10]);
@@ -727,7 +725,7 @@ var
   ReturnValue: Integer;
   TargetDB: TSQLiteDatabase;
 begin
-  TargetDB := TSQLiteDatabase.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'backup.db');
+  TargetDB := TSQLiteDatabase.Create(IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + '..\backup.db');
   try
     ReturnValue := FSQLiteDatabase.Backup(TargetDB);
 
@@ -763,7 +761,7 @@ var
   tbl: TSQLiteTable;
   SDB: TSQLiteDatabase;
 begin
-  sFile := IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + 'attach16.db';
+  sFile := IncludeTrailingPathDelimiter(ExtractFileDir(ParamStr(0))) + '..\attach16.db';
   SDB := TSQLiteDatabase.Create(sFile, seUTF16);
   SDB.ExecSQL('CREATE TABLE IF NOT EXISTS test ([ID] INTEGER PRIMARY KEY,[OtherID] INTEGER NULL,[Name] VARCHAR (255),'+
   '[Number] FLOAT, [notes] BLOB, [picture] BLOB COLLATE NOCASE);');
@@ -849,7 +847,7 @@ end;
 
 procedure TestTSQLiteTable.SetUp;
 begin
-  FSQLiteDatabase := TSQLiteDatabase.Create('test.db');
+  FSQLiteDatabase := TSQLiteDatabase.Create('..\test.db');
   FSQLiteTable := TSQLiteTable.Create(FSQLiteDatabase, 'select * from testtable where ID = 1');
 end;
 
@@ -984,7 +982,7 @@ end;
 
 procedure TestTSQLitePreparedStatement.SetUp;
 begin
-  FSQLiteDatabase := TSQLiteDatabase.Create('test.db');
+  FSQLiteDatabase := TSQLiteDatabase.Create('..\test.db');
  // FSQLitePreparedStatement := TSQLitePreparedStatement.Create(FSQLiteDatabase,
  //   'select * from testtable where (OtherID = ?) and (Name = ?)  and (Number = ?)');
   FSQLitePreparedStatement := TSQLitePreparedStatement.Create(FSQLiteDatabase,
@@ -1209,7 +1207,7 @@ begin
   FSQLitePreparedStatement.ClearParams;
 
   ss := TStringStream.Create('Testing strings');
-  img := TFileStream.Create('Sunset.jpg', fmOpenRead or fmShareDenyNone);
+  img := TFileStream.Create('..\Sunset.jpg', fmOpenRead or fmShareDenyNone);
 
   FSQLitePreparedStatement.PrepareStatement(SQL, [ss, img]);
   ReturnValue := FSQLitePreparedStatement.ExecSQL(SQL);
@@ -1233,7 +1231,7 @@ begin
   FSQLitePreparedStatement.ClearParams;
 
   ss := TStringStream.Create('Testing strings');
-  img := TFileStream.Create('Sunset.jpg', fmOpenRead or fmShareDenyNone);
+  img := TFileStream.Create('..\Sunset.jpg', fmOpenRead or fmShareDenyNone);
 
   FSQLitePreparedStatement.PrepareStatement(SQL);
   FSQLitePreparedStatement.SetParamBlob(1, ss);
@@ -1268,7 +1266,7 @@ end;
 
 procedure TestTSQLiteField.SetUp;
 begin
-  FSQLiteDatabase := TSQLiteDatabase.Create('test.db');
+  FSQLiteDatabase := TSQLiteDatabase.Create('..\test.db');
   FSQLiteField := nil;
   FDst := FSQLiteDatabase.GetPreparedStatementIntf('select * from testtable where rowid < 100').ExecQuery;
   //stmt := FSQLiteDatabase.GetPreparedStatement('select * from testtable where rowid < 100');
@@ -1361,6 +1359,7 @@ procedure TestTSQLiteField.TestAsDouble;
 var
   ReturnValue: Double;
 begin
+  FSQLiteDatabase.ExecSQL('update testtable set Number=-1.111 where ID = 2;');
   FDst.Next;
   FSQLiteField := FDst.FieldByName['Number'];
   ReturnValue := FSQLiteField.AsDouble;
@@ -1438,7 +1437,7 @@ end;
 
 procedure TestTSQLiteUniTable.SetUp;
 begin
-  FSQLiteDatabase := TSQLiteDatabase.Create('test.db');
+  FSQLiteDatabase := TSQLiteDatabase.Create('..\test.db');
   stmt := TSQLitePreparedStatement.Create(FSQLiteDatabase);
   FSQLiteUniTable := stmt.ExecQuery('select * from testtable');
 end;
@@ -1461,7 +1460,6 @@ begin
   Check(ReturnValue <> nil);
 end;
 
-{$IFNDEF CPUX64}
 procedure TestTSQLiteUniTable.TestForInLoop;
 var
   ARec: Variant;
@@ -1494,7 +1492,6 @@ begin
 
   Check(iCount = iCorrectCount);
 end;
-{$ENDIF}
 
 procedure TestTSQLiteUniTable.TestFieldAsInteger;
 var
