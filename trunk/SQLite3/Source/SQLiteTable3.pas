@@ -130,7 +130,7 @@ type
     Statement: TSQLiteStmt;
   end;
 
-  TSQLiteUserFunc = reference to procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPChar);
+  TSQLiteUserFunc = reference to procedure(sqlite3_context: Psqlite3_context; ArgIndex: Integer; ArgValue: PPsqlite3_value);
   TSQLiteUserFuncFinal = reference to procedure(sqlite3_context: Psqlite3_context);
 
   TSQLiteFuncType = (sftScalar, sftAggregate);
@@ -157,15 +157,17 @@ type
     constructor Create(DB: TSQLiteDatabase); virtual;
     destructor Destroy; override;
 
-    class function GetValueType(ArgValue: PPChar): Integer;
-    class function ValueAsInteger(ArgValue: PPChar): Int64;
-    class function ValueAsString(ArgValue: PPChar): string;
-    class function ValueAsFloat(ArgValue: PPChar): Double;
+    class function GetValueType(ArgValue: Psqlite3_value): Integer;
+    class function ValueAsInteger(ArgValue: Psqlite3_value): Int64;
+    class function ValueAsString(ArgValue: Psqlite3_value): string;
+    class function ValueAsFloat(ArgValue: Psqlite3_value): Double;
 
-    class procedure ResultAsNull(sqlite3_context: Pointer);
-    class procedure ResultAsInteger(sqlite3_context: Pointer; Val: Int64);
-    class procedure ResultAsString(sqlite3_context: Pointer; Val: string);
-    class procedure ResultAsFloat(sqlite3_context: Pointer; Val: Double);
+    class function GetArrayElement(Elements: PPsqlite3_value; Index: Integer): Psqlite3_value;
+
+    class procedure ResultAsNull(sqlite3_context: Psqlite3_context);
+    class procedure ResultAsInteger(sqlite3_context: Psqlite3_context; Val: Int64);
+    class procedure ResultAsString(sqlite3_context: Psqlite3_context; Val: string);
+    class procedure ResultAsFloat(sqlite3_context: Psqlite3_context; Val: Double);
 
     procedure AddScalarFunction(const FuncName: AnsiString; ArgCount: Integer;
       AFunc: TSQLiteUserFunc);
@@ -643,7 +645,7 @@ type
     function Value: Variant;
     function ValueDef(const Def: Variant): Variant;
   end;
-  {$IFNDEF CPUX64}
+
   /// <summary>
   /// TSQLiteUniTable enumerator
   ///  for ARec in Dataset do...
@@ -659,7 +661,6 @@ type
     function MoveNext: Boolean;
     property Current: Variant read GetCurrent;
   end;
-  {$ENDIF}
 
   /// <summary>
   /// Interface of SQLite table
@@ -675,9 +676,7 @@ type
     function GetFieldByNameAsString(const FieldName: string): string;
     function GetFieldIndex(const FieldName: string): integer;
     function GetFieldByName(const FieldName: string): TSQLiteField;
-    {$IFNDEF CPUX64}
     function GetEnumerator: TUniTableEnumerator;
-    {$ENDIF}
     function FindField(const AFieldName: string): TSQLiteField;
     function FieldAsInteger(I: Cardinal): int64;
     function FieldAsBlob(I: Cardinal): TMemoryStream;
@@ -726,9 +725,7 @@ type
     function GetFieldCount: Cardinal;
     function GetRow: Cardinal;
     function GetEOF: Boolean;
-    {$IFNDEF CPUX64}
     function GetCurrentRec: Variant;
-    {$ENDIF}
   protected
     function GetFieldsVal(I: Cardinal): Variant; virtual;
   public
@@ -736,10 +733,8 @@ type
     constructor Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt); overload;
     constructor Create(DB: TSQLiteDatabase; const SQL: string); overload;
     destructor Destroy; override;
-    {$IFNDEF CPUX64}
     function GetEnumerator: TUniTableEnumerator;
     property CurrentRec: Variant read GetCurrentRec;
-    {$ENDIF}
     /// <summary>
     /// Checks if fieldname exists
     /// </summary>
@@ -788,7 +783,6 @@ uses
   {$ENDIF}
   TypInfo;
 
-{$IFNDEF CPUX64}
 type
   { A custom variant type that implements the mapping from the property names
     to the DataSet fields. }
@@ -803,7 +797,7 @@ type
 type
   { Our layout of the variants record data.
     We only hold a pointer to the DataSet. }
-  TVarDataRecordData = packed record
+  TVarDataRecordData = record
     VType: TVarType;
     Reserved1, Reserved2, Reserved3: Word;
     DataSet: TSQLiteUniTable;
@@ -871,8 +865,6 @@ begin
   end;}
 end;
 
-{$ENDIF}
-
 const
   //default supported column types defined in sqlite db
   // each other type which isn't supported is bound as text column
@@ -907,7 +899,7 @@ begin
   end;
 end;
 
-procedure AggStepDefFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPChar); cdecl;
+procedure AggStepDefFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPsqlite3_value); cdecl;
 var
   Funcs: PSQLiteFuncs;
   UserFunc: TSQLiteUserFunc;
@@ -921,7 +913,7 @@ begin
   end;
 end;
 
-procedure ScalarDefFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPChar); cdecl;
+procedure ScalarDefFunc(sqlite3_context: Psqlite3_context; cArg: integer; ArgV: PPsqlite3_value); cdecl;
 var
   Funcs: PSQLiteFuncs;
   UserFunc: TSQLiteUserFunc;
@@ -1262,7 +1254,7 @@ end;
 procedure TSQLiteDatabase.BindSQL(Query: TSQLiteQuery; const Index: Integer; const Value: String);
 begin
   if Assigned(Query.Statement) then
-    Sqlite3_Bind_Text16(Query.Statement, Index, PChar(Value), Length(Value) * SizeOf(char), Pointer(SQLITE_STATIC))
+    Sqlite3_Bind_Text16(Query.Statement, Index, PChar(Value), Length(Value) * SizeOf(char), SQLITE_STATIC)
   else
     RaiseError('Could not bind string to prepared SQL statement', Query.SQL);
 end;
@@ -2457,12 +2449,11 @@ begin
   end;
 
 end;
-{$IFNDEF CPUX64}
+
 function TSQLiteUniTable.GetEnumerator: TUniTableEnumerator;
 begin
   Result := TUniTableEnumerator.Create(Self);
 end;
-{$ENDIF}
 
 function TSQLiteUniTable.GetEOF: Boolean;
 begin
@@ -2564,12 +2555,10 @@ begin
   Result := FColNames[I];
 end;
 
-{$IFNDEF CPUX64}
 function TSQLiteUniTable.GetCurrentRec: Variant;
 begin
   Result := VarDataRecordCreate(Self);
 end;
-{$ENDIF}
 
 function TSQLiteUniTable.GetField(I: Integer): TSQLiteField;
 begin
@@ -3598,47 +3587,52 @@ begin
   inherited;
 end;
 
-class function TSQLiteFunctions.GetValueType(ArgValue: PPChar): Integer;
+class function TSQLiteFunctions.GetArrayElement(Elements: PPsqlite3_value;
+  Index: Integer): Psqlite3_value;
 begin
-  Result := sqlite3_value_type(ArgValue^);
+  Result := Psqlite3_value(PByte(Elements) + Index * SizeOf(Elements^))^
 end;
 
-class procedure TSQLiteFunctions.ResultAsFloat(sqlite3_context: Pointer; Val: Double);
+class function TSQLiteFunctions.GetValueType(ArgValue: Psqlite3_value): Integer;
+begin
+  Result := sqlite3_value_type(ArgValue);
+end;
+
+class procedure TSQLiteFunctions.ResultAsFloat(sqlite3_context: Psqlite3_context; Val: Double);
 begin
   sqlite3_result_double(sqlite3_context, Val);
 end;
 
-class procedure TSQLiteFunctions.ResultAsInteger(sqlite3_context: Pointer; Val: Int64);
+class procedure TSQLiteFunctions.ResultAsInteger(sqlite3_context: Psqlite3_context; Val: Int64);
 begin
   sqlite3_result_int64(sqlite3_context, Val);
 end;
 
-class procedure TSQLiteFunctions.ResultAsNull(sqlite3_context: Pointer);
+class procedure TSQLiteFunctions.ResultAsNull(sqlite3_context: Psqlite3_context);
 begin
   sqlite3_result_null(sqlite3_context);
 end;
 
-class procedure TSQLiteFunctions.ResultAsString(sqlite3_context: Pointer; Val: string);
+class procedure TSQLiteFunctions.ResultAsString(sqlite3_context: Psqlite3_context; Val: string);
 begin
   sqlite3_result_text16(sqlite3_context, PChar(Val), -1, nil);
 end;
 
-class function TSQLiteFunctions.ValueAsFloat(ArgValue: PPChar): Double;
+class function TSQLiteFunctions.ValueAsFloat(ArgValue: Psqlite3_value): Double;
 begin
-  Result := sqlite3_value_double(ArgValue^);
+  Result := sqlite3_value_double(ArgValue);
 end;
 
-class function TSQLiteFunctions.ValueAsInteger(ArgValue: PPChar): Int64;
+class function TSQLiteFunctions.ValueAsInteger(ArgValue: Psqlite3_value): Int64;
 begin
-  Result := sqlite3_value_int64(ArgValue^);
+  Result := sqlite3_value_int64(ArgValue);
 end;
 
-class function TSQLiteFunctions.ValueAsString(ArgValue: PPChar): string;
+class function TSQLiteFunctions.ValueAsString(ArgValue: Psqlite3_value): string;
 begin
-  Result := sqlite3_value_text16(ArgValue^);
+  Result := sqlite3_value_text16(ArgValue);
 end;
 
-{$IFNDEF CPUX64}
 { TSQLiteUniTable.TUniTableEnumerator }
 
 constructor TUniTableEnumerator.Create(ATable: TSQLiteUniTable);
@@ -3670,18 +3664,12 @@ begin
     Result := FDataSet.Next;
 end;
 
-{$ENDIF}
-
 initialization
   TSQLiteDatabase.FColumnTypes := TDictionary<string,Integer>.Create(DEF_COLCOUNT);
   TSQLiteDatabase.InitDefaultColumnTypes;
-  {$IFNDEF CPUX64}
   VarDataRecordType := TVarDataRecordType.Create;
-  {$ENDIF}
 finalization
   TSQLiteDatabase.FColumnTypes.Free;
-  {$IFNDEF CPUX64}
   FreeAndNil(VarDataRecordType);
-  {$ENDIF}
 end.
 
