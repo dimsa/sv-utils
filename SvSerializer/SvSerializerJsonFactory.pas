@@ -955,12 +955,12 @@ end;
 
 constructor TSvJsonString.Create(const AValue: string);
 begin
-  {$IFDEF DELPHI16_UP}
+//  {$IFDEF DELPHI16_UP}
   //it seems that XE2 escapes string properly. Update: XE2 leaves unicode characters unescaped though...
-  inherited Create(AValue);
-  {$ELSE}
+//  inherited Create(AValue);
+ // {$ELSE}
   inherited Create(EscapeValue(AValue));
-  {$ENDIF}
+ // {$ENDIF}
 end;
 
 function TSvJsonString.EscapeValue(const AValue: string): string;
@@ -969,7 +969,7 @@ function TSvJsonString.EscapeValue(const AValue: string): string;
   begin
     System.Insert(AChars, Dest, AIndex);
     System.Delete(Dest, AIndex + 2, 1);
-    Inc(AIndex);
+    Inc(AIndex, 2);
   end;
 
   procedure AddUnicodeChars(const AChars: string; var Dest: string; var AIndex: Integer); inline;
