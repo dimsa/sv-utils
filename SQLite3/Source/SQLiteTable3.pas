@@ -745,6 +745,7 @@ type
     function FieldAsBlob(I: Cardinal): TMemoryStream;
     function FieldAsBlobPtr(I: Cardinal; out iNumBytes: integer): Pointer;
     function FieldAsBlobText(I: Cardinal): string;
+    function FieldAsBlobVariant(I: Cardinal): Variant;
     function FieldIsNull(I: Cardinal): Boolean;
     function FieldAsString(I: Cardinal): string;
     function FieldAsDouble(I: Cardinal): double;
@@ -2519,6 +2520,27 @@ begin
 
 end;
 
+function TSQLiteUniTable.FieldAsBlobVariant(I: Cardinal): Variant;
+var
+  LStream: TMemoryStream;
+  MyBuffer: Pointer;
+begin
+  Result := Null;
+  LStream := FieldAsBlob(I);
+  if Assigned(LStream) then
+  begin
+    try
+      LStream.Position := 0;
+      Result := VarArrayCreate([0, LStream.Size - 1], VarByte);
+      MyBuffer := VarArrayLock(Result);
+      LStream.ReadBuffer(MyBuffer^, LStream.Size);
+    finally
+      VarArrayUnlock(Result);
+      LStream.Free;
+    end;
+   end;
+end;
+
 function TSQLiteUniTable.FieldAsDouble(I: cardinal): double;
 begin
   Result := Sqlite3_ColumnDouble(fstmt, i);
@@ -2633,7 +2655,7 @@ begin
     dtNumeric:
       Result := FieldAsDouble(I);
     dtBlob:
-      Result := FieldAsBlobText(I);
+      Result := FieldAsBlobVariant(I); //  FieldAsBlobText(I);
     dtDate:
     begin
       if not TryStrToDate(FieldAsString(I), dt1, fDB.FmtSett) then
@@ -2867,13 +2889,16 @@ begin
       end;
       vtObject:
       begin
-        if (Params[i].VObject is TStream) then
-        begin
-          SetParamBlob(i+1, TStream(Params[i].VObject));
-        end
+        if not Assigned(Params[i].VObject) then
+          SetParamNull(i+1)
         else
         begin
-          raise ESQLiteException.Create('Unsupported param object type');
+          if (Params[i].VObject is TStream) then
+          begin
+            SetParamBlob(i+1, TStream(Params[i].VObject));
+          end
+          else
+            raise ESQLiteException.Create('Unsupported param object type');
         end;
       end;
       vtVariant:
