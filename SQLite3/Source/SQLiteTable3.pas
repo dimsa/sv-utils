@@ -3129,14 +3129,15 @@ begin
   try
     Self.SQL := SQL;
 
-    if Length(Params) > 0 then
+    if FStmt = nil then
     begin
-      if FStmt = nil then
-      begin
-        PrepareStatement(SQL);
-      end;
+      PrepareStatement(SQL);
+    end;
 
-      SetParams(Params);
+    SetParams(Params);
+
+    if fParams.Count > 0 then
+    begin
       iStepResult := Sqlite3_step(FStmt);
       Result := (iStepResult = SQLITE_DONE);
       if not Result then
