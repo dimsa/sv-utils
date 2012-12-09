@@ -3210,6 +3210,8 @@ var
   AVal: TValue;
   fld: TSQLiteField;
   metaClass: TClass;
+  LMethods: TArray<TRttiMethod>;
+  LParameters: TArray<TRttiParameter>;
 begin
   Result := False;
   if Assigned(DataList) then
@@ -3224,11 +3226,13 @@ begin
         props := rtype.GetProperties;
         if Length(props) > 0 then
         begin
-          for mType in rType.GetMethods do
+          LMethods := rtype.GetMethods;
+          for mType in LMethods do
           begin
             if mType.HasExtendedInfo and mType.IsConstructor then
             begin
-              if Length(mType.GetParameters) = 0 then
+              LParameters := mType.GetParameters;
+              if Length(LParameters) = 0 then
               begin
                 // invoke
                 metaClass := rType.AsInstance.MetaclassType;
