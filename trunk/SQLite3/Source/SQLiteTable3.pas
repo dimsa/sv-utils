@@ -2631,11 +2631,10 @@ end;
 
 function TSQLiteUniTable.GetFieldsVal(I: Cardinal): Variant;
 var
-  //thisvalue: pstring;
   thistype: integer;
   dt1: TDateTime;
 begin
-  Result := Unassigned;
+  Result := Null;
   if EOF then
     raise ESqliteException.Create('Table is at End of File')
   else if FieldIsNull(I) then
@@ -2655,22 +2654,17 @@ begin
     dtNumeric:
       Result := FieldAsDouble(I);
     dtBlob:
-      Result := FieldAsBlobVariant(I); //  FieldAsBlobText(I);
+      Result := FieldAsBlobVariant(I);
     dtDate:
     begin
-      if not TryStrToDate(FieldAsString(I), dt1, fDB.FmtSett) then
-        Result := Unassigned
-      else
+      if TryStrToDate(FieldAsString(I), dt1, fDB.FmtSett) then
         Result := dt1;
     end;
-
     dtDateTime:
-      if not TryStrToDateTime(FieldAsString(I), dt1, fDB.FmtSett) then
-        Result := Unassigned
-      else
+    begin
+      if TryStrToDateTime(FieldAsString(I), dt1, fDB.FmtSett) then
         Result := dt1;
-  else
-    Result := Unassigned;
+    end;
   end;
 end;
 
