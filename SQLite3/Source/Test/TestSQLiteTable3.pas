@@ -42,6 +42,7 @@ type
     procedure TestGetPreparedStatement1;
     procedure TestGetPreparedStatementIntf;
     procedure TestGetPreparedStatementIntfAndGetQuery;
+    procedure TestGetPreparedStatementIntfAndGetQueryMemory;
     procedure TestUpdateBlob;
     procedure TestCommit;
     procedure TestRollback;
@@ -543,6 +544,28 @@ begin
   ReturnValue := FSQLiteDatabase.GetPreparedStatementIntf(SQL, [5, 1.1]).ExecQueryIntf.FieldByName['ID'].AsInteger;
 
   CheckTrue(ReturnValue > 5);
+end;
+
+procedure TestTSQLiteDatabase.TestGetPreparedStatementIntfAndGetQueryMemory;
+var
+  LDB: TSQLiteDatabase;
+  LStmt: TSQLitePreparedStatement;
+begin
+  LDB := TSQLiteDatabase.Create(':memory:');
+  try
+    LDB.ExecSQL('CREATE TABLE test (id integer)');
+    LDB.ExecSQL('INSERT INTO test (id) values (1)');
+    LStmt := LDB.GetPreparedStatement('SELECT * FROM test');
+    try
+      {TODO -oLinas -cGeneral : refactor prepared statement and queries so that queries should not need to free internal sqlite statements}
+      CheckFalse(LStmt.ExecQueryIntf.EOF);
+     // CheckTrue(LStmt.ExecQueryIntf.EOF);
+    finally
+      LStmt.Free;
+    end;
+  finally
+    LDB.Free;
+  end;
 end;
 
 procedure TestTSQLiteDatabase.TestUpdateBlob;
