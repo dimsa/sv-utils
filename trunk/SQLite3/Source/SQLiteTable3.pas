@@ -1037,7 +1037,7 @@ end;
 
 destructor TSQLiteDatabase.Destroy;
 begin
-  if FConnected then
+  if FConnected and (SQLite_Handle <> 0) then
     Close;
   fParams.Free;
   FFunctions.Free;
