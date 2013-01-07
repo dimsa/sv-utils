@@ -2658,12 +2658,16 @@ begin
     dtDate:
     begin
       if TryStrToDate(FieldAsString(I), dt1, fDB.FmtSett) then
-        Result := dt1;
+        Result := dt1
+      else
+        Result := TDate(FieldAsDouble(I));
     end;
     dtDateTime:
     begin
       if TryStrToDateTime(FieldAsString(I), dt1, fDB.FmtSett) then
-        Result := dt1;
+        Result := dt1
+      else
+        Result := TDateTime(FieldAsDouble(I));
     end;
   end;
 end;
