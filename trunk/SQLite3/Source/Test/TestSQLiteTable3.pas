@@ -164,6 +164,7 @@ type
     procedure TestFieldAsDouble;
     procedure TestNext;
     procedure TestForInLoop;
+    procedure TestNativeFields();
   end;
 
   TestSQLiteGlobals = class(TTestCase)
@@ -1591,6 +1592,16 @@ begin
   I := 3;
   ReturnValue := FSQLiteDatabase.GetPreparedStatementIntf('select * from testtable where Number = 1').ExecQueryIntf.FieldAsDouble(I);
   Check(ReturnValue = 1);
+end;
+
+procedure TestTSQLiteUniTable.TestNativeFields;
+var
+  LString: string;
+begin
+  LString := FSQLiteUniTable.NativeFields[2].AsString;
+  CheckTrue(Length(LString)>0);
+  CheckTrue(FSQLiteUniTable.NativeFields[0].AsInteger > 0);
+  CheckTrue(FSQLiteUniTable.NativeFields[3].IsNull);
 end;
 
 procedure TestTSQLiteUniTable.TestNext;
