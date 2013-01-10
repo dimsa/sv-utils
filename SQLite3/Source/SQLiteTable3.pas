@@ -101,6 +101,7 @@ type
   TSQLiteUniTable = class;
   TSQLitePreparedStatement = class;
   TSQLiteFunctions = class;
+  TSQliteDummyDataset = class;
 
   ESQLiteException = class(Exception)
   end;
@@ -414,6 +415,8 @@ type
     property OnUpdate: TUpdateHookEvent read FOnUpdate write SetOnUpdate;
   end;
 
+
+
   /// <summary>
   /// SQLite table which holds all the data in memory
   /// </summary>
@@ -715,6 +718,7 @@ type
     fStmt: TSQLiteStmt;
     fDB: TSQLiteDatabase;
     fSQL: string;
+    FDst: TSQliteDummyDataset;
     function GetFieldsAsString(I: Cardinal): string;
     function GetColumns(I: integer): string;
     function GetFieldByNameAsString(const FieldName: string): string;
@@ -726,8 +730,10 @@ type
     function GetRow: Cardinal;
     function GetEOF: Boolean;
     function GetCurrentRec: Variant;
+    function GetNativeFields: TFields;
   protected
     function GetFieldsVal(I: Cardinal): Variant; virtual;
+    function CreateNativeField(AFieldType: Integer): TField;
   public
     constructor Create(DB: TSQLiteDatabase); overload; //use with caution!
     constructor Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt); overload;
@@ -749,6 +755,7 @@ type
     function FieldIsNull(I: Cardinal): Boolean;
     function FieldAsString(I: Cardinal): string;
     function FieldAsDouble(I: Cardinal): double;
+    function NativeFieldByName(const AFieldname: string): TField;
     function Next: Boolean;
 
     property EOF: Boolean read GetEOF;
@@ -764,6 +771,17 @@ type
     property Row: Cardinal read GetRow;
     property SQL: string read fSQL write fSQL;
     property Stmt: TSQLiteStmt read FStmt;
+    property NativeFields: TFields read GetNativeFields;
+  end;
+
+  TSQliteDummyDataset = class(TDataSet)
+  private
+    FTable: TSQLiteUniTable;
+  public
+    constructor Create(ATable: TSQLiteUniTable); reintroduce; overload;
+    destructor Destroy; override;
+
+    function GetFieldData(Field: TField; Buffer: Pointer): Boolean; overload; override;
   end;
 
 procedure DisposePointer(ptr: pointer); cdecl;
@@ -778,7 +796,9 @@ implementation
 
 uses
   Variants,
+  WideStrUtils,
   Math,
+  FMTBcd,
   {$IFDEF DELPHI14_UP}
   Rtti,
   {$ENDIF}
@@ -2351,6 +2371,19 @@ begin
   GetDataTypes;
 end;
 
+function TSQLiteUniTable.CreateNativeField(AFieldType: Integer): TField;
+begin
+  case AFieldType of
+    dtInt: Result := TIntegerField.Create(FDst);
+    dtNumeric: Result := TNumericField.Create(FDst);
+    dtStr: Result := TWideStringField.Create(FDst);
+    dtBlob: Result := TBlobField.Create(FDst);
+    dtDate, dtDateTime: Result := TDateTimeField.Create(FDst);
+    else
+      Result := TIntegerField.Create(FDst);
+  end;
+end;
+
 constructor TSQLiteUniTable.Create(DB: TSQLiteDatabase);
 begin
   inherited Create;
@@ -2361,6 +2394,7 @@ begin
   self.fSQL := SQL;
   fStmt := nil;
   FFields := TObjectList<TSQLiteField>.Create(True);
+  FDst := TSQliteDummyDataset.Create(Self);
 end;
 
 constructor TSQLiteUniTable.Create(DB: TSQLiteDatabase; hStmt: TSQLiteStmt);
@@ -2380,6 +2414,7 @@ begin
   begin
     fCols.Free;
   end;
+  FDst.Free;
   inherited;
 end;
 
@@ -2390,9 +2425,11 @@ var
   aField: TSQLiteField;
   DeclaredColType: PChar;
   iColType: Integer;
+  LField: TField;
 begin
   //get data types
   FFields.Clear;
+  FDst.Fields.Clear;
   fColCount := SQLite3_ColumnCount(fstmt);
   SetLength(FColTypes, fColCount);
   SetLength(FColNames, fColCount);
@@ -2418,26 +2455,6 @@ begin
       begin
         FColTypes[i] := dtStr;
       end;
-
-
-     { if (sColType = 'INTEGER') or (sColType = 'BOOLEAN') then
-        FColTypes[i] := dtInt
-      else
-        if (sColType = 'NUMERIC') or
-          (sColType = 'FLOAT') or
-          (sColType = 'DOUBLE') or
-          (sColType = 'REAL') then
-          FColTypes[i] := dtNumeric
-        else
-        if (sColType = 'DATETIME') then
-          FColTypes[i] := dtDateTime
-        else if (sColType = 'DATE') then
-          FColTypes[i] := dtDate
-        else
-        if sColType = 'BLOB' then
-          FColTypes[i] := dtBlob
-          else
-            FColTypes[i] := dtStr;  }
     end;
     aField := TSQLiteField.Create;
     aField.Table := Self;
@@ -2447,8 +2464,12 @@ begin
     FFields.Add(aField);
     fCols.Add(sColName, i);
     FColNames[i] := sColName;
-  end;
 
+    LField := CreateNativeField(FColTypes[i]);
+    LField.FieldName := sColName;
+    LField.DataSet := FDst;
+    LField.Index := i;
+  end;
 end;
 
 function TSQLiteUniTable.GetEnumerator: TUniTableEnumerator;
@@ -2554,6 +2575,11 @@ end;
 function TSQLiteUniTable.FieldAsString(I: cardinal): string;
 begin
   Result := self.GetFieldsAsString(I);
+end;
+
+function TSQLiteUniTable.NativeFieldByName(const AFieldname: string): TField;
+begin
+  Result := NativeFields[GetFieldIndex(AFieldname)];
 end;
 
 function TSQLiteUniTable.FieldIsNull(I: cardinal): boolean;
@@ -2672,6 +2698,11 @@ begin
   end;
 end;
 
+
+function TSQLiteUniTable.GetNativeFields: TFields;
+begin
+  Result := FDst.Fields;
+end;
 
 function TSQLiteUniTable.GetRow: cardinal;
 begin
@@ -3706,6 +3737,96 @@ begin
   end
   else
     Result := FDataSet.Next;
+end;
+
+{ TSQliteDummyDataset }
+
+constructor TSQliteDummyDataset.Create(ATable: TSQLiteUniTable);
+begin
+  inherited Create(nil);
+  FTable := ATable;
+end;
+
+destructor TSQliteDummyDataset.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TSQliteDummyDataset.GetFieldData(Field: TField; Buffer: Pointer): Boolean;
+var
+  Data: Variant;
+
+  procedure CurrToBuffer(const C: Currency);
+  begin
+   // if NativeFormat then
+   //   DataConvert(Field, @C, Buffer, True) else
+      Currency(Buffer^) := C;
+  end;
+
+  procedure VarToBuffer;
+  var
+    LDate: TDatetime;
+  begin
+      case Field.DataType of
+        ftGuid, ftFixedChar, ftString:
+          begin
+            PAnsiChar(Buffer)[Field.Size] := #0;
+            WideCharToMultiByte(0, 0, PWideChar(UnicodeString(Data)), Length(UnicodeString(Data))+1,
+              Buffer, Field.Size, nil, nil);
+          end;
+        ftFixedWideChar, ftWideString:
+          WStrCopy(Buffer, PWideChar(UnicodeString(Data)));
+        ftSmallint:
+          SmallInt(Buffer^) := SmallInt(Data);
+        ftWord:
+          Word(Buffer^) := Word(Data);
+        ftAutoInc, ftInteger:
+          Integer(Buffer^) := Data;
+        ftFloat, ftCurrency:
+            Double(Buffer^) := Double(Data);
+        ftFMTBCD:
+          TBcd(Buffer^) := VarToBcd(Data);
+        ftBCD:
+          CurrToBuffer(Data);
+        ftBoolean:
+          WordBool(Buffer^) := WordBool(Data);
+        ftDate, ftTime, ftDateTime:
+        begin
+          LDate := TDatetime(Data);
+          DataConvert(Field, @LDate, Buffer, True);
+        end;
+          //if NativeFormat then
+          //  DataConvert(Field, @(Data), Buffer, True) else
+         //   TOleDate(Buffer^) := date;
+        ftBytes, ftVarBytes:
+         // if NativeFormat then
+            DataConvert(Field, @Data, Buffer, True);// else
+         //   OleVariant(Buffer^) := Data;
+        ftInterface: IUnknown(Buffer^) := Data;
+        ftIDispatch: IDispatch(Buffer^) := Data;
+        ftLargeInt:
+         LargeInt(Buffer^) := StrToInt64(VarToStr(Data));
+          {if Decimal(Data).sign > 0 then
+            LargeInt(Buffer^):=-1*Decimal(Data).Lo64
+          else
+            LargeInt(Buffer^):=Decimal(Data).Lo64;}
+        ftBlob..ftTypedBinary, ftVariant, ftWideMemo: OleVariant(Buffer^) := Data;
+      else
+        DatabaseErrorFmt('Unsupported field type (%s) in field %s', [FieldTypeNames[Field.DataType],
+          Field.DisplayName]);
+      end;
+  end;
+
+begin
+  Result := True;
+
+  if (Buffer = nil) or (FTable.FieldIsNull(Field.Index)) then
+  begin
+    Exit(False);
+  end;
+
+  Data := FTable.GetField(Field.Index).Value;
+  VarToBuffer();
 end;
 
 initialization
