@@ -680,6 +680,7 @@ type
     function GetFieldIndex(const FieldName: string): integer;
     function GetFieldByName(const FieldName: string): TSQLiteField;
     function GetEnumerator: TUniTableEnumerator;
+    function GetNativeFields: TFields;
     function FindField(const AFieldName: string): TSQLiteField;
     function FieldAsInteger(I: Cardinal): int64;
     function FieldAsBlob(I: Cardinal): TMemoryStream;
@@ -688,6 +689,7 @@ type
     function FieldIsNull(I: Cardinal): Boolean;
     function FieldAsString(I: Cardinal): string;
     function FieldAsDouble(I: Cardinal): double;
+    function NativeFieldByName(const AFieldname: string): TField;
     function Next: Boolean;
 
     property EOF: Boolean read GetEOF;
@@ -701,6 +703,7 @@ type
     property Columns[I: integer]: string read GetColumns;
     property ColCount: Cardinal read GetFieldCount;
     property Row: Cardinal read GetRow;
+    property NativeFields: TFields read GetNativeFields;
   end;
 
   /// <summary>
