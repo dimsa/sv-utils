@@ -780,6 +780,13 @@ type
   TSQliteDummyDataset = class(TDataSet)
   private
     FTable: TSQLiteUniTable;
+  protected
+    function GetRecord(Buffer: TRecordBuffer; GetMode: TGetMode; DoCheck: Boolean): TGetResult; override;
+    procedure InternalClose; override;
+    procedure InternalHandleException; override;
+    procedure InternalInitFieldDefs; override;
+    procedure InternalOpen; override;
+    function IsCursorOpen: Boolean; override;
   public
     constructor Create(ATable: TSQLiteUniTable); reintroduce; overload;
     destructor Destroy; override;
@@ -3830,6 +3837,37 @@ begin
 
   Data := FTable.GetField(Field.Index).Value;
   VarToBuffer();
+end;
+
+function TSQliteDummyDataset.GetRecord(Buffer: TRecordBuffer; GetMode: TGetMode;
+  DoCheck: Boolean): TGetResult;
+begin
+  Result := inherited GetRecord(Buffer, GetMode, DoCheck);
+end;
+
+procedure TSQliteDummyDataset.InternalClose;
+begin
+  inherited;
+end;
+
+procedure TSQliteDummyDataset.InternalHandleException;
+begin
+  inherited;
+end;
+
+procedure TSQliteDummyDataset.InternalInitFieldDefs;
+begin
+  inherited;
+end;
+
+procedure TSQliteDummyDataset.InternalOpen;
+begin
+  inherited;
+end;
+
+function TSQliteDummyDataset.IsCursorOpen: Boolean;
+begin
+  Result := inherited IsCursorOpen;
 end;
 
 initialization
