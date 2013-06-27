@@ -26,7 +26,8 @@ uses
   SQLite3 in '..\SQLite3.pas',
   SQLiteTable3 in '..\SQLiteTable3.pas',
   TestSQLiteVirtualTable3 in 'TestSQLiteVirtualTable3.pas',
-  SQLiteVirtualTable3 in '..\SQLiteVirtualTable3.pas';
+  SQLiteVirtualTable3 in '..\SQLiteVirtualTable3.pas',
+  SQLite3Dataset in '..\SQLite3Dataset.pas';
 
 {$R *.RES}
 

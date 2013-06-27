@@ -4,40 +4,19 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, DB, DBClient, Grids, DBGrids, SQLiteTable3, MidasLib, ObjDS,
+  Dialogs, StdCtrls, DB, DBClient, Grids, DBGrids, SQLiteTable3, MidasLib,
   SQLite3Dataset;
 
 type
-  TMyData = class
-  private
-    FID: Integer;
-    FOtherID: Integer;
-    FName: string;
-    FNumber: Double;
-    FEmpty: Integer;
-  public
-    [TFieldMap('ID', ftInteger, 0, false)]
-    property ID: Integer read FID write FID;
-    [TFieldMap('OtherID', ftInteger, 0, false)]
-    property OtherID: Integer read FOtherID write FOtherID;
-    [TFieldMap('Name', ftWideString, 50, false)]
-    property Name: string read FName write FName;
-    [TFieldMap('Number', ftFloat, 0, false)]
-    property Number: Double read FNumber write FNumber;
-    property Empty: Integer read FEmpty write FEmpty;
-  end;
-
   TForm1 = class(TForm)
     dbg1: TDBGrid;
     ds1: TDataSource;
-    btn1: TButton;
     btn2: TButton;
     cbFilter: TCheckBox;
     btn3: TButton;
     btn4: TButton;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure btn1Click(Sender: TObject);
     procedure btn2Click(Sender: TObject);
     procedure cbFilterClick(Sender: TObject);
     procedure btn3Click(Sender: TObject);
@@ -60,32 +39,6 @@ uses
   Generics.Collections;
 
 {$R *.dfm}
-
-procedure TForm1.btn1Click(Sender: TObject);
-var
-  stmt: TSQLitePreparedStatement;
-  List: TObjectList<TMyData>;
-  Map: TDataSetMapping;
-begin
-  //load data to dataset
-  stmt := DB.GetPreparedStatement('select * from testtable limit 500');
-  List :=  TObjectList<TMyData>.Create;
-  Map := TDataSetMapping.Create(Dst);
-  Dst.DisableControls;
-  try
-    stmt.ExecSQLAndMapData<TMyData>(List);
-
-    Map.MappedType := List.ClassInfo;
-    Map.Value := List;
-
-    DSt.MergeChangeLog;
-  finally
-    DSt.EnableControls;
-    stmt.Free;
-    List.Free;
-    Map.Free;
-  end;
-end;
 
 procedure TForm1.btn2Click(Sender: TObject);
 begin

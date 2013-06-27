@@ -423,22 +423,25 @@ begin
 
     Result := AStmt.ExecQuery;
     //define DS
-    FieldDefs.Clear;
+  //  FieldDefs.Clear;
     for i := 0 to Result.FieldCount - 1 do
     begin
-      fType := SQLiteDataTypeToDelphiFieldType(Result.Fields[i].FieldType);
-      case fType of
-        ftString, ftWideString:
-        begin
-          {TODO -oLinas -cGeneral : make property to choose default string field size}
-          FieldDefs.Add(Result.Fields[i].Name, fType, 50);
-        end
-        else
-        begin
-          FieldDefs.Add(Result.Fields[i].Name, fType);
+      //fixes issue 6
+      if (FieldDefs.IndexOf(Result.Fields[i].Name) < 0) then
+      begin
+        fType := SQLiteDataTypeToDelphiFieldType(Result.Fields[i].FieldType);
+        case fType of
+          ftString, ftWideString:
+          begin
+            {TODO -oLinas -cGeneral : make property to choose default string field size}
+            FieldDefs.Add(Result.Fields[i].Name, fType, 50);
+          end
+          else
+          begin
+            FieldDefs.Add(Result.Fields[i].Name, fType);
+          end;
         end;
       end;
-
     end;
 
     CreateDataSet;
