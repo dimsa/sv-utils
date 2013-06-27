@@ -5,9 +5,7 @@ uses
   uMain in 'uMain.pas' {Form1},
   SQLite3 in '..\..\Source\SQLite3.pas',
   SQLite3Dataset in '..\..\Source\SQLite3Dataset.pas',
-  SQLiteTable3 in '..\..\Source\SQLiteTable3.pas',
-  ObjDS in '..\..\Source\ObjDS.pas',
-  RttiUtils in '..\..\Source\RttiUtils.pas';
+  SQLiteTable3 in '..\..\Source\SQLiteTable3.pas';
 
 {$R *.res}
 

@@ -32,22 +32,13 @@ object Form1: TForm1
     TitleFont.Name = 'Tahoma'
     TitleFont.Style = []
   end
-  object btn1: TButton
-    Left = 8
-    Top = 8
-    Width = 81
-    Height = 25
-    Caption = 'Load From List'
-    TabOrder = 1
-    OnClick = btn1Click
-  end
   object btn2: TButton
     Left = 95
     Top = 8
     Width = 75
     Height = 25
     Caption = 'Save to DB'
-    TabOrder = 2
+    TabOrder = 1
     OnClick = btn2Click
   end
   object cbFilter: TCheckBox
@@ -58,7 +49,7 @@ object Form1: TForm1
     Caption = 'Default Status Filter'
     Checked = True
     State = cbChecked
-    TabOrder = 3
+    TabOrder = 2
     OnClick = cbFilterClick
   end
   object btn3: TButton
@@ -67,7 +58,7 @@ object Form1: TForm1
     Width = 75
     Height = 25
     Caption = 'Open'
-    TabOrder = 4
+    TabOrder = 3
     OnClick = btn3Click
   end
   object btn4: TButton
@@ -76,7 +67,7 @@ object Form1: TForm1
     Width = 97
     Height = 25
     Caption = 'Refresh Record'
-    TabOrder = 5
+    TabOrder = 4
     OnClick = btn4Click
   end
   object ds1: TDataSource
