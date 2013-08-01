@@ -26,6 +26,7 @@ type
     DB: TSQLiteDatabase;
     Dst: TSQLiteDataset;
     UpdSQL: TSQLiteUpdateSQL;
+    FDBDirectory: string;
   public
     { Public declarations }
   end;
@@ -69,10 +70,13 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  DB := TSQLiteDatabase.Create('test.db');
+  FDBDirectory := IncludeTrailingPathDelimiter(ExpandFileName( ExtractFileDir(ParamStr(0)) + '\..\..\..\..\Source\Test\Debug\Win32' ) );
+
+  DB := TSQLiteDatabase.Create(FDBDirectory + 'test.db');
   Dst := TSQLiteDataset.Create(Self);
   Dst.Database := DB;
   ds1.DataSet := Dst;
+  Dst.FieldDefs.Add('NAME', ftWideString, 25);
 
   UpdSQL := TSQLiteUpdateSQL.Create(Self);
   UpdSQL.DeleteSQL.Text := 'delete from testtable where ID = :ID';
