@@ -409,7 +409,7 @@ end;
 {$HINTS OFF}
 function TSQLiteDataset.DoInitFields(AStmt: TSQLitePreparedStatement): TSQLiteUniTable;
 var
-  i: Integer;
+  i, LIndex: Integer;
   fType: TFieldType;
 begin
   Result := nil;
@@ -427,7 +427,8 @@ begin
     for i := 0 to Result.FieldCount - 1 do
     begin
       //fixes issue 6
-      if (FieldDefs.IndexOf(Result.Fields[i].Name) < 0) then
+      LIndex := FieldDefs.IndexOf(Result.Fields[i].Name);
+      if (LIndex < 0) then
       begin
         fType := SQLiteDataTypeToDelphiFieldType(Result.Fields[i].FieldType);
         case fType of
@@ -441,6 +442,10 @@ begin
             FieldDefs.Add(Result.Fields[i].Name, fType);
           end;
         end;
+      end
+      else
+      begin
+        FieldDefs.Items[LIndex].Index := i;
       end;
     end;
 
