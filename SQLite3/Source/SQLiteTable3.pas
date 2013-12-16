@@ -69,12 +69,12 @@ interface
 uses
   SQLite3,
   {$IFDEF DELPHI16_UP}
-  {$IFDEF WIN32}
+  {$IFDEF MSWINDOWS}
   Winapi.Windows,
   {$ENDIF}
   System.Classes, System.SysUtils, System.Generics.Collections, DB;
   {$ELSE}
-  {$IFDEF WIN32}
+  {$IFDEF MSWINDOWS}
   Windows,
   {$ENDIF}
   Classes, SysUtils, Generics.Collections, DB;
